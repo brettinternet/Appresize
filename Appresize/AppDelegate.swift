@@ -17,6 +17,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }()
 
     var stateMachine = AppStateMachine()
+    private var permissionMonitorTimer: Timer?
+    private var lastPermissionState = false
 }
 
 
@@ -28,7 +30,13 @@ extension AppDelegate {
         }
 
         statusMenu?.delegate = self
+        lastPermissionState = isTrusted(prompt: false)
+        startPermissionMonitoring()
         stateMachine.state = .validatingState
+    }
+    
+    func applicationWillTerminate(_ aNotification: Notification) {
+        stopPermissionMonitoring()
     }
 
     override func awakeFromNib() {
@@ -80,6 +88,33 @@ extension AppDelegate {
             : removeStatusItemFromMenubar()
     }
 
+}
+
+
+// MARK:- Permission Monitoring
+extension AppDelegate {
+    private func startPermissionMonitoring() {
+        permissionMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.checkPermissionChange()
+        }
+    }
+    
+    private func stopPermissionMonitoring() {
+        permissionMonitorTimer?.invalidate()
+        permissionMonitorTimer = nil
+    }
+    
+    private func checkPermissionChange() {
+        let currentPermissionState = isTrusted(prompt: false)
+        
+        // Check if permissions were just granted (changed from false to true)
+        if !lastPermissionState && currentPermissionState {
+            showRestartPrompt()
+            stopPermissionMonitoring() // Stop monitoring after showing prompt
+        }
+        
+        lastPermissionState = currentPermissionState
+    }
 }
 
 
