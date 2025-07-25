@@ -25,11 +25,18 @@ private func _log(_ level: LogLevel = .default, _ message: StaticString, _ args:
 }
 
 
+private func _isDebugAssertConfiguration() -> Bool {
+    #if DEBUG
+    return true
+    #else
+    return false
+    #endif
+}
+
 func log(_ level: LogLevel = .default, _ message: String) {
     if _isDebugAssertConfiguration() {
-        // just use `print` logging for now, it's easier to read in the Xcode console
         print("\(level.rawValue): \(message)")
-        //    } else {
-        //        log(level, "%@", message)
+    } else {
+        _log(level, "%@", message)
     }
 }

@@ -27,7 +27,7 @@ extension AppDelegate {
             try? Current.date().save(forKey: .firstLaunched, defaults: Current.defaults())
         }
 
-        statusMenu.delegate = self
+        statusMenu?.delegate = self
         stateMachine.state = .validatingState
     }
 
@@ -47,10 +47,10 @@ extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         do {
             let hidden = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask) == .option
-            versionMenuItem.isHidden = !hidden
+            versionMenuItem?.isHidden = !hidden
         }
         do {
-            accessibilityStatusMenuItem.isHidden = isTrusted(prompt: false)
+            accessibilityStatusMenuItem?.isHidden = isTrusted(prompt: false)
         }
     }
 }
@@ -65,8 +65,8 @@ extension AppDelegate {
             statusItem.button?.image = NSImage(named: "MenuIcon")
             return statusItem
         }()
-        statusMenu.autoenablesItems = false
-        versionMenuItem.title = "Version: \(appVersion())"
+        statusMenu?.autoenablesItems = false
+        versionMenuItem?.title = "Version: \(appVersion())"
     }
 
     func removeStatusItemFromMenubar() {
@@ -96,5 +96,9 @@ extension AppDelegate {
 
     @IBAction func helpClicked(_ sender: Any) {
         NSWorkspace.shared.open(Links.appHelp)
+    }
+
+    @IBAction func registerLicense(_ sender: Any) {
+        // License registration removed - this is now a free app
     }
 }

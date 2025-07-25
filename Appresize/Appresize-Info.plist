@@ -32,5 +32,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Appresize needs Apple Events permission to move and resize windows.</string>
+	<key>NSSystemAdministrationUsageDescription</key>
+	<string>Appresize needs system administration permission to control other applications' windows.</string>
 </dict>
 </plist>

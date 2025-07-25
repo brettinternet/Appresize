@@ -28,6 +28,11 @@ class PreferencesController: NSWindowController {
 
     @IBOutlet weak var versionLabel: NSTextField!
 
+    override func windowDidLoad() {
+        super.windowDidLoad()
+        updateCopy()
+    }
+
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
         updateCopy()
@@ -53,7 +58,6 @@ class PreferencesController: NSWindowController {
                 let m = Modifiers<Resize>(rawValue: modifier)
                 try? modifiers.toggle(m).save(forKey: .resizeModifiers, defaults: Current.defaults())
             }
-            // FIXME: this isn't great - maybe use a notification instead?
             Tracker.shared?.readModifiers()
         }
     }
@@ -105,20 +109,20 @@ extension PreferencesController: NSWindowDelegate {
             }
         }
 
-        resizeFromNearestCorner.state = Current.defaults().bool(forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
+        resizeFromNearestCorner?.state = Current.defaults().bool(forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
             ? .on : .off
 
-        showMenuIcon.state = Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue)
+        showMenuIcon?.state = Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue)
             ? .on : .off
 
         updateCopy()
     }
 
     func updateCopy() {
-        resizeInfoLabel.stringValue = Current.defaults().bool(forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
+        resizeInfoLabel?.stringValue = Current.defaults().bool(forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
             ? "Resizing will act on the window corner nearest to the cursor."
             : "Resizing will act on the lower right corner of the window."
 
-        versionLabel.stringValue = appVersion(short: true)
+        versionLabel?.stringValue = appVersion(short: true)
     }
 }

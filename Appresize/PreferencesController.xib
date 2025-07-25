@@ -6,7 +6,7 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
-        <customObject id="-2" userLabel="File's Owner" customClass="PreferencesController" customModule="Hummingbird" customModuleProvider="target">
+        <customObject id="-2" userLabel="File's Owner" customClass="PreferencesController" customModule="Appresize" customModuleProvider="target">
             <connections>
                 <outlet property="moveAlt" destination="Sj9-Rc-bDN" id="UaS-BH-HzV"/>
                 <outlet property="moveCommand" destination="ihP-uA-QNF" id="zfQ-wo-1XF"/>
