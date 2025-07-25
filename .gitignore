@@ -96,4 +96,10 @@ docs/
 *.gcno
 coverage/
 
+# clang
 default.profraw
+
+# task runner
+.task
+/Taskfile.yaml
+/Taskfile.yml

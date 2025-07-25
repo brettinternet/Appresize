@@ -1,4 +1,5 @@
 import Foundation
+@testable import Appresize
 
 
 let ReferenceDate = Date(timeIntervalSince1970: 1234567890)  // 2009-02-13 23:31:30 +0000

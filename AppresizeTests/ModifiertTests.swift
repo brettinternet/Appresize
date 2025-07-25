@@ -1,4 +1,5 @@
 import XCTest
+@testable import Appresize
 
 
 class ModifierTests: XCTestCase {

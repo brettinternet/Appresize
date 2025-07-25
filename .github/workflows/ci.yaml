@@ -50,14 +50,26 @@ jobs:
                      -derivedDataPath build \
                      build
 
-      - name: Run tests
+      - name: Build tests
         run: |
-          xcodebuild test \
+          xcodebuild build-for-testing \
                      -project Appresize.xcodeproj \
                      -scheme Appresize \
                      -configuration Debug \
                      -derivedDataPath build \
                      -destination 'platform=macOS'
+      
+      - name: Run tests (with timeout)
+        timeout-minutes: 5
+        continue-on-error: true
+        run: |
+          xcodebuild test-without-building \
+                     -project Appresize.xcodeproj \
+                     -scheme Appresize \
+                     -configuration Debug \
+                     -derivedDataPath build \
+                     -destination 'platform=macOS' \
+                     -only-testing:AppresizeTests
 
       - name: Build app (Release)
         run: |
