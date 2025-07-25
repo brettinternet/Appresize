@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  ci:
+    runs-on: macos-latest
+    if: "!contains(github.event.head_commit.message, 'skipci')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Cache derived data
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-derived-data-${{ hashFiles('**/*.xcodeproj') }}
+          restore-keys: |
+            ${{ runner.os }}-derived-data-
+
+      - name: Build app (Debug)
+        run: |
+          xcodebuild -project Appresize.xcodeproj \
+                     -scheme Appresize \
+                     -configuration Debug \
+                     -derivedDataPath build \
+                     build
+
+      - name: Run tests
+        run: |
+          xcodebuild test \
+                     -project Appresize.xcodeproj \
+                     -scheme Appresize \
+                     -configuration Debug \
+                     -derivedDataPath build \
+                     -destination 'platform=macOS'
+
+      - name: Build app (Release)
+        run: |
+          xcodebuild -project Appresize.xcodeproj \
+                     -scheme Appresize \
+                     -configuration Release \
+                     -derivedDataPath build \
+                     build
+
+      - name: Verify app bundle
+        run: |
+          echo "Checking app bundle structure:"
+          ls -la build/Build/Products/Release/
+          if [ -d "build/Build/Products/Release/Appresize.app" ]; then
+            echo "✅ App bundle created successfully"
+            echo "App bundle contents:"
+            ls -la "build/Build/Products/Release/Appresize.app/Contents/"
+            echo "Binary info:"
+            file "build/Build/Products/Release/Appresize.app/Contents/MacOS/Appresize"
+          else
+            echo "❌ App bundle not found"
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: appresize-debug-build
+          path: build/Build/Products/Release/Appresize.app
+          retention-days: 7
