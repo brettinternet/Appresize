@@ -4,6 +4,10 @@ import Cocoa
 extension AXUIElement {
 
     class func window(at position: CGPoint) -> AXUIElement? {
+        guard isTrusted(prompt: false) else {
+            return nil
+        }
+        
         var element: AXUIElement?
         var selected: AXUIElement?
         let systemwideElement = AXUIElementCreateSystemWide()
@@ -39,6 +43,8 @@ extension AXUIElement {
 
     var origin: CGPoint? {
         get {
+            guard isTrusted(prompt: false) else { return nil }
+            
             var pos = CGPoint.zero
 
             var ref: CFTypeRef?
@@ -62,7 +68,7 @@ extension AXUIElement {
             return success ? pos : nil
         }
         set {
-            guard var newValue = newValue else { return }
+            guard isTrusted(prompt: false), var newValue = newValue else { return }
             let success = withUnsafePointer(to: &newValue) { ptr -> Bool in
                 if let position = AXValueCreate(.cgPoint, ptr) {
                     switch AXUIElementSetAttributeValue(self, NSAccessibility.Attribute.position as CFString, position) {
@@ -83,6 +89,8 @@ extension AXUIElement {
 
     var size: CGSize? {
         get {
+            guard isTrusted(prompt: false) else { return nil }
+            
             var size: CGSize = CGSize.zero
 
             var ref: CFTypeRef?
@@ -106,7 +114,7 @@ extension AXUIElement {
             return success ? size : nil
         }
         set {
-            guard var newValue = newValue else { return }
+            guard isTrusted(prompt: false), var newValue = newValue else { return }
             let success = withUnsafePointer(to: &newValue) { ptr -> Bool in
                 if let size = AXValueCreate(.cgSize, ptr) {
                     switch AXUIElementSetAttributeValue(self, NSAccessibility.Attribute.size as CFString, size) {

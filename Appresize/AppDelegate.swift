@@ -98,7 +98,4 @@ extension AppDelegate {
         NSWorkspace.shared.open(Links.appHelp)
     }
 
-    @IBAction func registerLicense(_ sender: Any) {
-        // License registration removed - this is now a free app
-    }
 }

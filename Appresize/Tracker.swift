@@ -18,6 +18,10 @@ class Tracker {
     static var shared: Tracker? = nil
 
     static func enable() {
+        guard isTrusted(prompt: false) else {
+            log(.debug, "❌ Cannot enable tracker: accessibility not trusted")
+            return
+        }
         shared = try? .init()
     }
 
@@ -127,6 +131,11 @@ class Tracker {
 
 
     private func startTracking(at location: CGPoint) {
+        guard isTrusted(prompt: false) else {
+            log(.debug, "❌ Accessibility not trusted, cannot track window")
+            return
+        }
+        
         guard
             let trackedWindow = AXUIElement.window(at: location),
             let origin = trackedWindow.origin,

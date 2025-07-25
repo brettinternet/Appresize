@@ -656,19 +656,6 @@
                         <action selector="accessibilityStatusClicked:" target="494" id="Dpl-IT-w3x"/>
                     </connections>
                 </menuItem>
-                <menuItem title="Register license..." id="Bjm-xz-6Bf">
-                    <modifierMask key="keyEquivalentModifierMask"/>
-                    <connections>
-                        <action selector="registerLicense:" target="494" id="eSr-0K-RIt"/>
-                    </connections>
-                </menuItem>
-                <menuItem isSeparatorItem="YES" id="EEo-f4-j0Q"/>
-                <menuItem title="Send coffee..." id="YPG-30-mN1">
-                    <modifierMask key="keyEquivalentModifierMask"/>
-                    <connections>
-                        <action selector="showTipJar:" target="494" id="4ry-aO-MyG"/>
-                    </connections>
-                </menuItem>
                 <menuItem title="Help..." id="8Jk-r5-2bm">
                     <modifierMask key="keyEquivalentModifierMask"/>
                     <connections>

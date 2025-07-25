@@ -50,7 +50,6 @@ extension AppStateMachine: StateMachineDelegate {
     enum State: TransitionDelegate {
         case launching
         case validatingState
-        case unregistered
         case activating
         case activated
         case deactivated
@@ -62,7 +61,6 @@ extension AppStateMachine: StateMachineDelegate {
                 case (.launching, .validatingState):
                     return .continue
                 case (.activated, .activating):
-                    // license check succeeded while already active (i.e. when in trial)
                     return .continue
                 case (.validatingState, .activating):
                     return .continue
@@ -110,20 +108,19 @@ extension AppStateMachine {
     }
 
     func activate(showAlert: Bool, keepTrying: Bool) {
+        guard isTrusted(prompt: false) else {
+            if showAlert {
+                showAccessibilityAlert()
+            }
+            stateMachine.state = .deactivated
+            return
+        }
+        
         Tracker.enable()
         if Tracker.isActive {
             stateMachine.state = .activated
         } else {
-            if showAlert {
-                showAccessibilityAlert()
-            }
-            if keepTrying {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self.activate(showAlert: false, keepTrying: true)
-                }
-            } else {
-                stateMachine.state = .deactivated
-            }
+            stateMachine.state = .deactivated
         }
     }
 
