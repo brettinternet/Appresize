@@ -25,6 +25,7 @@ class PreferencesController: NSWindowController {
     @IBOutlet weak var resizeInfoLabel: NSTextField!
 
     @IBOutlet weak var showMenuIcon: NSButton!
+    @IBOutlet weak var launchAtLogin: NSButton!
 
     @IBOutlet weak var versionLabel: NSTextField!
 
@@ -84,6 +85,17 @@ class PreferencesController: NSWindowController {
         updateCopy()
         (NSApp.delegate as? AppDelegate)?.updateStatusItemVisibility()
     }
+    
+    @IBAction func launchAtLoginClicked(_ sender: Any) {
+        let value: NSNumber = {
+            var v = Current.defaults().bool(forKey: DefaultsKeys.launchAtLogin.rawValue)
+            v.toggle()
+            return NSNumber(booleanLiteral: v)
+        }()
+        Current.defaults().set(value, forKey: DefaultsKeys.launchAtLogin.rawValue)
+        setLaunchAtLogin(value.boolValue)
+        updateCopy()
+    }
 }
 
 extension PreferencesController: NSWindowDelegate {
@@ -113,6 +125,9 @@ extension PreferencesController: NSWindowDelegate {
             ? .on : .off
 
         showMenuIcon?.state = Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue)
+            ? .on : .off
+
+        launchAtLogin?.state = Current.defaults().bool(forKey: DefaultsKeys.launchAtLogin.rawValue)
             ? .on : .off
 
         updateCopy()

@@ -29,6 +29,13 @@ extension AppDelegate {
             try? Current.date().save(forKey: .firstLaunched, defaults: Current.defaults())
         }
 
+        // Sync login item state with UserDefaults
+        let actualLoginState = isLaunchAtLoginEnabled()
+        let savedLoginState = Current.defaults().bool(forKey: DefaultsKeys.launchAtLogin.rawValue)
+        if actualLoginState != savedLoginState {
+            Current.defaults().set(actualLoginState, forKey: DefaultsKeys.launchAtLogin.rawValue)
+        }
+
         statusMenu?.delegate = self
         lastPermissionState = isTrusted(prompt: false)
         startPermissionMonitoring()

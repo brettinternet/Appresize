@@ -8,7 +8,7 @@ Resize & move apps from anywhere on the window with custom modifiers.
 
 ## Releases
 
-I have not elected to sign the app by joining the Apple Developer Program. The releases have been self-signed by me and can be installed by bypassing the typical app security on macOS. You're also welcome to build and bundle the app yourself with Xcode. For a signed release, consider downloading the [upstream of this project](https://github.com/finestructure/Hummingbird).
+I have not elected to sign the app by joining the Apple Developer Program. The releases have been self-signed by me and can be installed by bypassing the typical app security on macOS. You're also welcome to build and bundle the app yourself with Xcode. For a signed release, consider installing the [upstream fork release](https://github.com/finestructure/Hummingbird).
 
 To build, run the release task from `Taskfile.dist.yaml`.
 

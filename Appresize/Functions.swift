@@ -1,4 +1,5 @@
 import Cocoa
+import ServiceManagement
 
 
 func showAccessibilityAlert() {
@@ -116,4 +117,53 @@ func appVersion(short: Bool = false) -> String {
         let bundleVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
         return "\(shortVersion) (\(bundleVersion))"
     }
+}
+
+
+// MARK: - Login Item Management
+
+func setLaunchAtLogin(_ enabled: Bool) {
+    if #available(macOS 13.0, *) {
+        // Use modern ServiceManagement API for macOS 13+
+        if enabled {
+            try? SMAppService.mainApp.register()
+        } else {
+            try? SMAppService.mainApp.unregister()
+        }
+    } else {
+        // Fallback for older macOS versions
+        setLaunchAtLoginLegacy(enabled)
+    }
+}
+
+func isLaunchAtLoginEnabled() -> Bool {
+    if #available(macOS 13.0, *) {
+        // Use modern ServiceManagement API for macOS 13+
+        return SMAppService.mainApp.status == .enabled
+    } else {
+        // Fallback for older macOS versions
+        return isLaunchAtLoginEnabledLegacy()
+    }
+}
+
+@available(macOS, deprecated: 13.0)
+private func setLaunchAtLoginLegacy(_ enabled: Bool) {
+    let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.finestructure.Appresize"
+    
+    if enabled {
+        if !SMLoginItemSetEnabled(bundleIdentifier as CFString, true) {
+            log(.error, "Failed to enable login item")
+        }
+    } else {
+        if !SMLoginItemSetEnabled(bundleIdentifier as CFString, false) {
+            log(.error, "Failed to disable login item")
+        }
+    }
+}
+
+@available(macOS, deprecated: 13.0)
+private func isLaunchAtLoginEnabledLegacy() -> Bool {
+    // For legacy versions, we'll check the UserDefaults since SMLoginItemSetEnabled
+    // doesn't provide a way to query current state reliably
+    return Current.defaults().bool(forKey: DefaultsKeys.launchAtLogin.rawValue)
 }
