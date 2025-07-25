@@ -4,8 +4,91 @@ version: "3"
 
 dotenv: [.env]
 
+vars:
+  PROJECT: Appresize.xcodeproj
+  SCHEME: Appresize
+  BUILD_DIR: build
+  CONFIGURATION_DEBUG: Debug
+  CONFIGURATION_RELEASE: Release
+  DESTINATION: "platform=macOS"
+
 tasks:
   default:
+    desc: List available tasks
     silent: true
     cmds:
       - task -l
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf "{{.BUILD_DIR}}"
+      - xcodebuild clean -project "{{.PROJECT}}" -scheme "{{.SCHEME}}"
+
+  build:
+    desc: Build the app (Debug)
+    cmds:
+      - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" build
+
+  build:release:
+    desc: Build the app (Release)
+    cmds:
+      - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" build
+
+  test:build:
+    desc: Build tests
+    cmds:
+      - xcodebuild build-for-testing -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
+
+  test:
+    desc: Run all tests
+    deps: [test:build]
+    cmds:
+      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
+
+  test:unit:
+    desc: Run unit tests only
+    deps: [test:build]
+    cmds:
+      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests
+
+  run:
+    desc: Build and run the app (Debug)
+    deps: [build]
+    cmds:
+      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/Appresize.app"
+
+  run:release:
+    desc: Build and run the app (Release)
+    deps: [build:release]
+    cmds:
+      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app"
+
+  archive:
+    desc: Create an archive for distribution
+    cmds:
+      - xcodebuild archive -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" -archivePath "{{.BUILD_DIR}}/Appresize.xcarchive"
+
+  dev:
+    desc: Quick development cycle (clean, build, test)
+    cmds:
+      - task: clean
+      - task: build
+      - task: test
+
+  ci:
+    desc: Full CI pipeline (build both configs, test)
+    cmds:
+      - task: clean
+      - task: build
+      - task: build:release
+      - task: test
+
+  info:
+    desc: Show project information
+    silent: true
+    cmds:
+      - "echo 'Project: {{.PROJECT}}'"
+      - "echo 'Scheme: {{.SCHEME}}'"
+      - "echo 'Build Directory: {{.BUILD_DIR}}'"
+      - xcodebuild -version
