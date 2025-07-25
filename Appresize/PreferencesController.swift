@@ -29,15 +29,22 @@ class PreferencesController: NSWindowController {
     @IBOutlet weak var requireDragToActivate: NSButton!
 
     @IBOutlet weak var versionLabel: NSTextField!
+    @IBOutlet weak var accessibilityStatusLabel: NSTextField!
+    @IBOutlet weak var openSystemSettingsButton: NSButton!
+    
+    private var permissionMonitorTimer: Timer?
 
     override func windowDidLoad() {
         super.windowDidLoad()
+        updateAccessibilityStatus()
         updateCopy()
     }
 
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
+        updateAccessibilityStatus()
         updateCopy()
+        startPermissionMonitoring()
     }
 
 
@@ -108,9 +115,18 @@ class PreferencesController: NSWindowController {
         Tracker.shared?.readModifiers()  // Update the tracker with new setting
         updateCopy()
     }
+    
+    @IBAction func openSystemSettingsClicked(_ sender: Any) {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
 }
 
 extension PreferencesController: NSWindowDelegate {
+    
+    func windowWillClose(_ notification: Notification) {
+        stopPermissionMonitoring()
+    }
 
     func windowDidChangeOcclusionState(_ notification: Notification) {
         do {
@@ -145,14 +161,44 @@ extension PreferencesController: NSWindowDelegate {
         requireDragToActivate?.state = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
             ? .on : .off
 
+        updateAccessibilityStatus()
         updateCopy()
     }
 
+    func updateAccessibilityStatus() {
+        let isEnabled = isTrusted(prompt: false)
+        
+        if isEnabled {
+            accessibilityStatusLabel?.isHidden = true
+            openSystemSettingsButton?.isHidden = true
+        } else {
+            accessibilityStatusLabel?.isHidden = false
+            accessibilityStatusLabel?.stringValue = "⚠️ Accessibility permission is required"
+            accessibilityStatusLabel?.textColor = NSColor.systemOrange
+            openSystemSettingsButton?.isHidden = false
+        }
+    }
+    
     func updateCopy() {
         resizeInfoLabel?.stringValue = Current.defaults().bool(forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
             ? "Resizing will act on the window corner nearest to the cursor."
             : "Resizing will act on the lower right corner of the window."
 
         versionLabel?.stringValue = appVersion(short: true)
+    }
+    
+    private func startPermissionMonitoring() {
+        // Stop any existing timer
+        stopPermissionMonitoring()
+        
+        // Check accessibility permissions every 2 seconds while preferences window is open
+        permissionMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.updateAccessibilityStatus()
+        }
+    }
+    
+    private func stopPermissionMonitoring() {
+        permissionMonitorTimer?.invalidate()
+        permissionMonitorTimer = nil
     }
 }

@@ -7,21 +7,23 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="PreferencesController" customModule="Appresize" customModuleProvider="target">
             <connections>
+                <outlet property="accessibilityStatusLabel" destination="jFx-3h-BvR" id="accessibilityStatusLabel-outlet"/>
                 <outlet property="launchAtLogin" destination="TnR-QZ-Jig" id="launchAtLogin-outlet"/>
                 <outlet property="moveAlt" destination="Sj9-Rc-bDN" id="UaS-BH-HzV"/>
                 <outlet property="moveCommand" destination="ihP-uA-QNF" id="zfQ-wo-1XF"/>
                 <outlet property="moveControl" destination="f0u-93-rmH" id="RUw-k3-LWp"/>
                 <outlet property="moveFn" destination="RzX-et-TGM" id="NgG-2Q-2T0"/>
                 <outlet property="moveShift" destination="cBr-VD-5GB" id="fW9-dz-vKk"/>
+                <outlet property="openSystemSettingsButton" destination="8bC-9T-mxN" id="openSystemSettingsButton-outlet"/>
                 <outlet property="requireDragToActivate" destination="jAC-Hd-tRx" id="requireDragToActivate-outlet"/>
                 <outlet property="resizeAlt" destination="frh-8a-H0z" id="5fk-e9-bQq"/>
                 <outlet property="resizeCommand" destination="IHA-Hv-cF2" id="qMk-Cv-bBg"/>
                 <outlet property="resizeControl" destination="Vho-Wo-heQ" id="hHk-K6-Pom"/>
                 <outlet property="resizeFn" destination="ZoB-Ah-hDB" id="0dw-ya-nGD"/>
                 <outlet property="resizeFromNearestCorner" destination="bBy-AW-VTy" id="N3f-hX-Ymd"/>
-                <outlet property="resizeInfoLabel" destination="kts-J2-yLG" id="FrF-JX-KO1"/>
                 <outlet property="resizeShift" destination="t0H-b4-ute" id="J8n-RE-hLE"/>
                 <outlet property="showMenuIcon" destination="pNU-or-TOn" id="showMenuIcon-outlet"/>
+                <outlet property="versionLabel" destination="qmQ-2u-XvL" id="versionLabel-outlet"/>
                 <outlet property="window" destination="F0z-JX-Cv5" id="gIp-Ho-8D9"/>
             </connections>
         </customObject>
@@ -30,14 +32,14 @@
         <window title="Preferences" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" releasedWhenClosed="NO" frameAutosaveName="PreferencesWindow" animationBehavior="default" id="F0z-JX-Cv5">
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
-            <rect key="contentRect" x="196" y="240" width="421" height="313"/>
+            <rect key="contentRect" x="196" y="240" width="367" height="337"/>
             <rect key="screenRect" x="0.0" y="0.0" width="1728" height="1079"/>
             <view key="contentView" wantsLayer="YES" id="se5-gp-TjO">
-                <rect key="frame" x="0.0" y="0.0" width="421" height="313"/>
+                <rect key="frame" x="0.0" y="0.0" width="367" height="337"/>
                 <autoresizingMask key="autoresizingMask"/>
                 <subviews>
-                    <box autoresizesSubviews="NO" fixedFrame="YES" borderType="line" title="Move" translatesAutoresizingMaskIntoConstraints="NO" id="7aw-kd-4Fq">
-                        <rect key="frame" x="17" y="142" width="93" height="151"/>
+                    <box autoresizesSubviews="NO" toolTip="Select which modifier keys to hold when moving windows. Hold these keys and move your mouse to drag windows around the screen." fixedFrame="YES" borderType="line" title="Move" translatesAutoresizingMaskIntoConstraints="NO" id="7aw-kd-4Fq">
+                        <rect key="frame" x="17" y="166" width="93" height="151"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <view key="contentView" id="Xtr-41-rxU">
                             <rect key="frame" x="4" y="5" width="85" height="131"/>
@@ -102,8 +104,9 @@
                         </view>
                     </box>
                     <box autoresizesSubviews="NO" fixedFrame="YES" borderType="line" title="Resize" translatesAutoresizingMaskIntoConstraints="NO" id="fRg-Ig-lQz">
-                        <rect key="frame" x="126" y="142" width="93" height="151"/>
+                        <rect key="frame" x="126" y="166" width="93" height="151"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <string key="toolTip">Select which modifier keys to hold when resizing windows. Hold these keys and move your mouse to resize windows from their corners.</string>
                         <view key="contentView" id="PNo-mj-ccR">
                             <rect key="frame" x="4" y="5" width="85" height="131"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -166,27 +169,10 @@
                             </subviews>
                         </view>
                     </box>
-                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" preferredMaxLayoutWidth="147" translatesAutoresizingMaskIntoConstraints="NO" id="GeX-Qx-8dF">
-                        <rect key="frame" x="252" y="198" width="151" height="82"/>
-                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Holding down the given modifier keys will allow moving or resizing windows." id="iR5-Jr-TWa">
-                            <font key="font" metaFont="message" size="11"/>
-                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
-                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
-                        </textFieldCell>
-                    </textField>
-                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" preferredMaxLayoutWidth="147" translatesAutoresizingMaskIntoConstraints="NO" id="kts-J2-yLG">
-                        <rect key="frame" x="246" y="55" width="151" height="65"/>
-                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Resizing will act on the lower right corner of the window." id="Pud-9Y-vkQ">
-                            <font key="font" metaFont="message" size="11"/>
-                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
-                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
-                        </textFieldCell>
-                    </textField>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="bBy-AW-VTy">
-                        <rect key="frame" x="24" y="105" width="198" height="18"/>
+                        <rect key="frame" x="24" y="129" width="198" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <string key="toolTip">When enabled, window resizes will use the corner closest to your cursor. When disabled, resizes always use the bottom-right corner.</string>
                         <buttonCell key="cell" type="check" title="Resize from nearest corner" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="Bo4-fU-O3J">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
@@ -195,8 +181,8 @@
                             <action selector="resizeFromNearestCornerClicked:" target="-2" id="WcX-aB-Oy4"/>
                         </connections>
                     </button>
-                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="pNU-or-TOn">
-                        <rect key="frame" x="24" y="79" width="198" height="18"/>
+                    <button toolTip="Shows or hides the Appresize icon in the menu bar. Use the menu bar icon to access preferences and quit the app." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="pNU-or-TOn">
+                        <rect key="frame" x="24" y="103" width="198" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Show menu icon" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="veU-QV-ewB">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -206,8 +192,8 @@
                             <action selector="hideMenuIconClicked:" target="-2" id="mNd-W0-MRv"/>
                         </connections>
                     </button>
-                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TnR-QZ-Jig">
-                        <rect key="frame" x="24" y="54" width="198" height="18"/>
+                    <button toolTip="Automatically starts Appresize when you log in to your Mac. The app will run in the background and be ready to use immediately." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TnR-QZ-Jig">
+                        <rect key="frame" x="24" y="78" width="198" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Launch at login" bezelStyle="regularSquare" imagePosition="left" inset="2" id="cdX-Sz-m46">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -218,8 +204,9 @@
                         </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dTt-aK-ndS">
-                        <rect key="frame" x="24" y="30" width="198" height="18"/>
+                        <rect key="frame" x="24" y="53" width="198" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <string key="toolTip">When enabled, windows will only resize or move when you drag the mouse while holding modifiers. When disabled, windows respond to any mouse movement while modifiers are held.</string>
                         <buttonCell key="cell" type="check" title="Require drag to activate" bezelStyle="regularSquare" imagePosition="left" inset="2" id="jAC-Hd-tRx">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
@@ -228,12 +215,42 @@
                             <action selector="requireDragToActivateClicked:" target="-2" id="CJ8-P0-zVB"/>
                         </connections>
                     </button>
+                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" preferredMaxLayoutWidth="236" translatesAutoresizingMaskIntoConstraints="NO" id="jFx-3h-BvR">
+                        <rect key="frame" x="24" y="20" width="236" height="17"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" lineBreakMode="clipping" alignment="left" title="⚠️ Accessibility permission is required" id="6lY-bD-vHs">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" red="1" green="0.58431372549019611" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="qmQ-2u-XvL">
+                        <rect key="frame" x="365" y="314" width="50" height="17"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" lineBreakMode="clipping" alignment="right" title="v0.0.1" id="vZt-xY-LmD">
+                            <font key="font" metaFont="miniSystem"/>
+                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="8bC-9T-mxN">
+                        <rect key="frame" x="279" y="13" width="75" height="32"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <string key="toolTip">Opens System Settings to the Privacy &amp; Security → Accessibility section where you can grant Appresize permission to control your computer.</string>
+                        <buttonCell key="cell" type="push" title="Open" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="4nX-mL-dkS">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="openSystemSettingsClicked:" target="-2" id="8jG-4k-m5H"/>
+                        </connections>
+                    </button>
                 </subviews>
             </view>
             <connections>
                 <outlet property="delegate" destination="-2" id="0bl-1N-AYu"/>
             </connections>
-            <point key="canvasLocation" x="-114" y="-174"/>
+            <point key="canvasLocation" x="-141.5" y="-162.5"/>
         </window>
     </objects>
 </document>
