@@ -88,6 +88,37 @@ class Tracker {
         // Check if we should respond to this event type based on drag-only setting
         let isDragEvent = type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged
         let isMoveEvent = type == .mouseMoved
+        let isMouseButtonEvent = type == .leftMouseDown || type == .leftMouseUp || 
+                                type == .rightMouseDown || type == .rightMouseUp ||
+                                type == .otherMouseDown || type == .otherMouseUp
+        
+        // If we're currently in an active state (moving or resizing), absorb all mouse events
+        // to prevent default actions like text selection
+        if currentState != .idle && (isDragEvent || isMoveEvent || isMouseButtonEvent) {
+            let nextState = state(for: event.flags)
+            
+            switch (currentState, nextState) {
+                case (.moving, .moving):
+                    move(delta: event.mouseDelta)
+                    return true  // Block all mouse events while moving
+                case (.resizing, .resizing):
+                    resize(delta: event.mouseDelta)
+                    return true  // Block all mouse events while resizing
+                case (.moving, .idle), (.resizing, .idle):
+                    currentState = nextState
+                    return true  // Block the final event that ends the operation
+                case (.moving, .resizing):
+                    startTracking(at: event.location)
+                    currentState = nextState
+                    return true  // Block transition events
+                case (.resizing, .moving):
+                    startTracking(at: event.location)
+                    currentState = nextState
+                    return true  // Block transition events
+                default:
+                    break
+            }
+        }
         
         if requireDragToActivate && !isDragEvent {
             return false  // Only respond to drag events when drag-only mode is enabled
@@ -113,6 +144,7 @@ class Tracker {
             // .moving -> X
             case (.moving, .moving):
                 move(delta: event.mouseDelta)
+                absortEvent = true  // Block default actions while moving
             case (.moving, .idle),
                  (.moving, .resizing):
                 break
@@ -125,6 +157,7 @@ class Tracker {
                 absortEvent = true
             case (.resizing, .resizing):
                 resize(delta: event.mouseDelta)
+                absortEvent = true  // Block default actions while resizing
         }
 
         currentState = nextState
@@ -228,10 +261,19 @@ extension Tracker {
 private func enableTap() throws -> (eventTap: CFMachPort, runLoopSource: CFRunLoopSource?)  {
     // https://stackoverflow.com/a/31898592/1444152
 
-    let eventMask = (1 << CGEventType.mouseMoved.rawValue) |
-                    (1 << CGEventType.leftMouseDragged.rawValue) |
-                    (1 << CGEventType.rightMouseDragged.rawValue) |
-                    (1 << CGEventType.otherMouseDragged.rawValue)
+    let mouseMoved = 1 << CGEventType.mouseMoved.rawValue
+    let leftDragged = 1 << CGEventType.leftMouseDragged.rawValue
+    let rightDragged = 1 << CGEventType.rightMouseDragged.rawValue
+    let otherDragged = 1 << CGEventType.otherMouseDragged.rawValue
+    let leftDown = 1 << CGEventType.leftMouseDown.rawValue
+    let leftUp = 1 << CGEventType.leftMouseUp.rawValue
+    let rightDown = 1 << CGEventType.rightMouseDown.rawValue
+    let rightUp = 1 << CGEventType.rightMouseUp.rawValue
+    let otherDown = 1 << CGEventType.otherMouseDown.rawValue
+    let otherUp = 1 << CGEventType.otherMouseUp.rawValue
+    
+    let eventMask = mouseMoved | leftDragged | rightDragged | otherDragged |
+                    leftDown | leftUp | rightDown | rightUp | otherDown | otherUp
     guard let eventTap = CGEvent.tapCreate(
         tap: .cghidEventTap,
         place: .headInsertEventTap,
