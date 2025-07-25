@@ -61,7 +61,6 @@ jobs:
       
       - name: Run tests (with timeout)
         timeout-minutes: 5
-        continue-on-error: true
         run: |
           xcodebuild test-without-building \
                      -project Appresize.xcodeproj \
@@ -69,7 +68,7 @@ jobs:
                      -configuration Debug \
                      -derivedDataPath build \
                      -destination 'platform=macOS' \
-                     -only-testing:AppresizeTests
+                     -only-testing:AppresizeTests/ModifierTests
 
       - name: Build app (Release)
         run: |

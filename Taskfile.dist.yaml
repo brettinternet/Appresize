@@ -22,7 +22,7 @@ tasks:
   clean:
     desc: Clean build artifacts
     cmds:
-      - rm -rf "{{.BUILD_DIR}}"
+      - /bin/rm -rf "{{.BUILD_DIR}}"
       - xcodebuild clean -project "{{.PROJECT}}" -scheme "{{.SCHEME}}"
 
   build:
@@ -47,7 +47,13 @@ tasks:
       - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
 
   test:unit:
-    desc: Run unit tests only
+    desc: Run unit tests only (excludes tests that require system permissions)
+    deps: [test:build]
+    cmds:
+      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests/ModifierTests
+
+  test:all:
+    desc: Run all tests (may require manual interaction for permissions)
     deps: [test:build]
     cmds:
       - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests
