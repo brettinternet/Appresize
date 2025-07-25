@@ -13,6 +13,7 @@
                 <outlet property="moveControl" destination="f0u-93-rmH" id="RUw-k3-LWp"/>
                 <outlet property="moveFn" destination="RzX-et-TGM" id="NgG-2Q-2T0"/>
                 <outlet property="moveShift" destination="cBr-VD-5GB" id="fW9-dz-vKk"/>
+                <outlet property="requireDragToActivate" destination="jAC-Hd-tRx" id="requireDragToActivate-outlet"/>
                 <outlet property="resizeAlt" destination="frh-8a-H0z" id="5fk-e9-bQq"/>
                 <outlet property="resizeCommand" destination="IHA-Hv-cF2" id="qMk-Cv-bBg"/>
                 <outlet property="resizeControl" destination="Vho-Wo-heQ" id="hHk-K6-Pom"/>
@@ -30,7 +31,7 @@
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
             <rect key="contentRect" x="196" y="240" width="421" height="313"/>
-            <rect key="screenRect" x="0.0" y="0.0" width="2560" height="1415"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1728" height="1079"/>
             <view key="contentView" wantsLayer="YES" id="se5-gp-TjO">
                 <rect key="frame" x="0.0" y="0.0" width="421" height="313"/>
                 <autoresizingMask key="autoresizingMask"/>
@@ -175,7 +176,7 @@
                         </textFieldCell>
                     </textField>
                     <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" preferredMaxLayoutWidth="147" translatesAutoresizingMaskIntoConstraints="NO" id="kts-J2-yLG">
-                        <rect key="frame" x="252" y="44" width="151" height="65"/>
+                        <rect key="frame" x="246" y="55" width="151" height="65"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Resizing will act on the lower right corner of the window." id="Pud-9Y-vkQ">
                             <font key="font" metaFont="message" size="11"/>
@@ -184,7 +185,7 @@
                         </textFieldCell>
                     </textField>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="bBy-AW-VTy">
-                        <rect key="frame" x="30" y="94" width="198" height="18"/>
+                        <rect key="frame" x="24" y="105" width="198" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Resize from nearest corner" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="Bo4-fU-O3J">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -195,7 +196,7 @@
                         </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="pNU-or-TOn">
-                        <rect key="frame" x="30" y="68" width="198" height="18"/>
+                        <rect key="frame" x="24" y="79" width="198" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Show menu icon" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="veU-QV-ewB">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -206,7 +207,7 @@
                         </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TnR-QZ-Jig">
-                        <rect key="frame" x="30" y="43" width="198" height="18"/>
+                        <rect key="frame" x="24" y="54" width="198" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Launch at login" bezelStyle="regularSquare" imagePosition="left" inset="2" id="cdX-Sz-m46">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -214,6 +215,17 @@
                         </buttonCell>
                         <connections>
                             <action selector="launchAtLoginClicked:" target="-2" id="zdc-Vu-QfP"/>
+                        </connections>
+                    </button>
+                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dTt-aK-ndS">
+                        <rect key="frame" x="24" y="30" width="198" height="18"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Require drag to activate" bezelStyle="regularSquare" imagePosition="left" inset="2" id="jAC-Hd-tRx">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="requireDragToActivateClicked:" target="-2" id="CJ8-P0-zVB"/>
                         </connections>
                     </button>
                 </subviews>

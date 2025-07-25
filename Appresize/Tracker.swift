@@ -44,6 +44,7 @@ class Tracker {
     private var currentState: State = .idle
     private var moveModifiers = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
     private var resizeModifiers = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
+    private var requireDragToActivate: Bool = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
 
 
     private init() throws {
@@ -68,6 +69,7 @@ class Tracker {
     @objc func readModifiers() {
         moveModifiers = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
         resizeModifiers = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
+        requireDragToActivate = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
     }
 
 
@@ -82,6 +84,18 @@ class Tracker {
         }
 
         if moveModifiers.isEmpty && resizeModifiers.isEmpty { return false }
+
+        // Check if we should respond to this event type based on drag-only setting
+        let isDragEvent = type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged
+        let isMoveEvent = type == .mouseMoved
+        
+        if requireDragToActivate && !isDragEvent {
+            return false  // Only respond to drag events when drag-only mode is enabled
+        }
+        
+        if !requireDragToActivate && !isMoveEvent && !isDragEvent {
+            return false  // In normal mode, respond to both move and drag events
+        }
 
         var absortEvent = false
         let nextState = state(for: event.flags)
@@ -214,7 +228,10 @@ extension Tracker {
 private func enableTap() throws -> (eventTap: CFMachPort, runLoopSource: CFRunLoopSource?)  {
     // https://stackoverflow.com/a/31898592/1444152
 
-    let eventMask = (1 << CGEventType.mouseMoved.rawValue)
+    let eventMask = (1 << CGEventType.mouseMoved.rawValue) |
+                    (1 << CGEventType.leftMouseDragged.rawValue) |
+                    (1 << CGEventType.rightMouseDragged.rawValue) |
+                    (1 << CGEventType.otherMouseDragged.rawValue)
     guard let eventTap = CGEvent.tapCreate(
         tap: .cghidEventTap,
         place: .headInsertEventTap,

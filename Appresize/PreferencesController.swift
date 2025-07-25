@@ -26,6 +26,7 @@ class PreferencesController: NSWindowController {
 
     @IBOutlet weak var showMenuIcon: NSButton!
     @IBOutlet weak var launchAtLogin: NSButton!
+    @IBOutlet weak var requireDragToActivate: NSButton!
 
     @IBOutlet weak var versionLabel: NSTextField!
 
@@ -96,6 +97,17 @@ class PreferencesController: NSWindowController {
         setLaunchAtLogin(value.boolValue)
         updateCopy()
     }
+    
+    @IBAction func requireDragToActivateClicked(_ sender: Any) {
+        let value: NSNumber = {
+            var v = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
+            v.toggle()
+            return NSNumber(booleanLiteral: v)
+        }()
+        Current.defaults().set(value, forKey: DefaultsKeys.requireDragToActivate.rawValue)
+        Tracker.shared?.readModifiers()  // Update the tracker with new setting
+        updateCopy()
+    }
 }
 
 extension PreferencesController: NSWindowDelegate {
@@ -128,6 +140,9 @@ extension PreferencesController: NSWindowDelegate {
             ? .on : .off
 
         launchAtLogin?.state = Current.defaults().bool(forKey: DefaultsKeys.launchAtLogin.rawValue)
+            ? .on : .off
+
+        requireDragToActivate?.state = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
             ? .on : .off
 
         updateCopy()

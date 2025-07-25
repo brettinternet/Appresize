@@ -8,6 +8,7 @@ enum DefaultsKeys: String {
     case resizeFromNearestCorner
     case showMenuIcon
     case launchAtLogin
+    case requireDragToActivate
 }
 
 
@@ -15,7 +16,8 @@ let DefaultPreferences = [
     DefaultsKeys.moveModifiers.rawValue: Modifiers<Move>.defaultValue,
     DefaultsKeys.resizeModifiers.rawValue: Modifiers<Resize>.defaultValue,
     DefaultsKeys.showMenuIcon.rawValue: NSNumber.init(booleanLiteral: true),
-    DefaultsKeys.launchAtLogin.rawValue: NSNumber.init(booleanLiteral: false)
+    DefaultsKeys.launchAtLogin.rawValue: NSNumber.init(booleanLiteral: false),
+    DefaultsKeys.requireDragToActivate.rawValue: NSNumber.init(booleanLiteral: false)
 ]
 
 
