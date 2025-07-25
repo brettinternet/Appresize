@@ -19,7 +19,7 @@ task build:release
 Open the app `build/Build/Products/Release/Appresize.app`. 
 
 > [!IMPORTANT]  
-> With a new build, you'll have to quit the previous app build, remove and re-add the app entry in MacOS settings Privacy & Security > Accessibility.
+> With a new build, you'll have to quit the previously built app, remove and re-add the app entry in MacOS settings Privacy & Security > Accessibility.
 
 ## Known Limitations
 
