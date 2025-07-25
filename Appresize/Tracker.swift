@@ -45,6 +45,9 @@ class Tracker {
     private var moveModifiers = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
     private var resizeModifiers = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
     private var requireDragToActivate: Bool = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
+    private var accessibilityMonitorTimer: Timer?
+    private var lastEventTime: CFAbsoluteTime = 0
+    private static let maxEventAbsorptionTime: CFAbsoluteTime = 5.0  // Max 5 seconds of continuous absorption
 
 
     private init() throws {
@@ -54,12 +57,14 @@ class Tracker {
         self.eventTap = res.eventTap
         self.runLoopSource = res.runLoopSource
         NotificationCenter.default.addObserver(self, selector: #selector(readModifiers), name: UserDefaults.didChangeNotification, object: Current.defaults())
+        startAccessibilityMonitoring()
         #endif
     }
 
 
     deinit {
         #if !TEST
+        stopAccessibilityMonitoring()
         disableTap(eventTap: eventTap, runLoopSource: runLoopSource)
         NotificationCenter.default.removeObserver(self)
         #endif
@@ -71,13 +76,56 @@ class Tracker {
         resizeModifiers = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
         requireDragToActivate = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
     }
+    
+    
+    private func startAccessibilityMonitoring() {
+        // Check accessibility permissions every 2 seconds
+        accessibilityMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.checkAccessibilityPermissions()
+        }
+    }
+    
+    
+    private func stopAccessibilityMonitoring() {
+        accessibilityMonitorTimer?.invalidate()
+        accessibilityMonitorTimer = nil
+    }
+    
+    
+    @objc private func checkAccessibilityPermissions() {
+        guard !isTrusted(prompt: false) else { return }
+        
+        log(.error, "⚠️ Accessibility permissions revoked - safely disabling tracker to prevent system freeze")
+        
+        // Safely disable the tracker on the main thread
+        DispatchQueue.main.async {
+            Tracker.disable()
+        }
+    }
 
 
     public func handleEvent(_ event: CGEvent, type: CGEventType) -> Bool {
+        // Safety check: verify accessibility permissions are still granted
+        guard isTrusted(prompt: false) else {
+            log(.error, "⚠️ Accessibility permissions lost during event handling - aborting")
+            DispatchQueue.main.async {
+                Tracker.disable()
+            }
+            return false
+        }
+        
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             // need to re-enable our eventTap (We got disabled. Usually happens on a slow resizing app)
             log(.debug, "Re-enabling")
             #if !TEST
+            // Double-check permissions before re-enabling
+            guard isTrusted(prompt: false) else {
+                log(.error, "⚠️ Cannot re-enable tap: accessibility permissions lost")
+                DispatchQueue.main.async {
+                    Tracker.disable()
+                }
+                return false
+            }
             CGEvent.tapEnable(tap: eventTap, enable: true)
             #endif
             return false
@@ -95,6 +143,20 @@ class Tracker {
         // If we're currently in an active state (moving or resizing), absorb all mouse events
         // to prevent default actions like text selection
         if currentState != .idle && (isDragEvent || isMoveEvent || isMouseButtonEvent) {
+            let currentTime = CFAbsoluteTimeGetCurrent()
+            
+            // Safety timeout: if we've been absorbing events for too long, reset to idle
+            if lastEventTime > 0 && (currentTime - lastEventTime) > Self.maxEventAbsorptionTime {
+                log(.error, "⚠️ Event absorption timeout - resetting to idle state to prevent system freeze")
+                currentState = .idle
+                lastEventTime = 0
+                return false
+            }
+            
+            if lastEventTime == 0 {
+                lastEventTime = currentTime
+            }
+            
             let nextState = state(for: event.flags)
             
             switch (currentState, nextState) {
@@ -106,6 +168,7 @@ class Tracker {
                     return true  // Block all mouse events while resizing
                 case (.moving, .idle), (.resizing, .idle):
                     currentState = nextState
+                    lastEventTime = 0  // Reset timer when returning to idle
                     return true  // Block the final event that ends the operation
                 case (.moving, .resizing):
                     startTracking(at: event.location)
