@@ -31,6 +31,7 @@ class PreferencesController: NSWindowController {
     @IBOutlet weak var versionLabel: NSTextField!
     @IBOutlet weak var accessibilityStatusLabel: NSTextField!
     @IBOutlet weak var openSystemSettingsButton: NSButton!
+    @IBOutlet weak var githubLink: NSTextField!
     
     private var permissionMonitorTimer: Timer?
 
@@ -38,6 +39,7 @@ class PreferencesController: NSWindowController {
         super.windowDidLoad()
         updateAccessibilityStatus()
         updateCopy()
+        setupGitHubLink()
     }
 
     override func showWindow(_ sender: Any?) {
@@ -119,6 +121,41 @@ class PreferencesController: NSWindowController {
     @IBAction func openSystemSettingsClicked(_ sender: Any) {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
+    }
+    
+    private func setupGitHubLink() {
+        let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(githubLinkClicked(_:)))
+        githubLink.addGestureRecognizer(clickGesture)
+        
+        // Add tracking area for cursor changes
+        let trackingArea = NSTrackingArea(
+            rect: githubLink.bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: ["element": "githubLink"]
+        )
+        githubLink.addTrackingArea(trackingArea)
+    }
+    
+    @objc private func githubLinkClicked(_ sender: Any) {
+        let url = URL(string: "https://github.com/brettinternet/Appresize")!
+        NSWorkspace.shared.open(url)
+    }
+    
+    override func mouseEntered(with event: NSEvent) {
+        if let userInfo = event.trackingArea?.userInfo,
+           let element = userInfo["element"] as? String,
+           element == "githubLink" {
+            NSCursor.pointingHand.set()
+        }
+    }
+    
+    override func mouseExited(with event: NSEvent) {
+        if let userInfo = event.trackingArea?.userInfo,
+           let element = userInfo["element"] as? String,
+           element == "githubLink" {
+            NSCursor.arrow.set()
+        }
     }
 }
 

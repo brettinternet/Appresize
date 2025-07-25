@@ -19,7 +19,7 @@ trim_trailing_whitespace = false
 [*.y?ml]
 indent_size = 2
 
-[*.swift]
+[*.swift,*.xib,*.storyboard]
 indent_style = space
 indent_size = 4
 tab_width = 4
