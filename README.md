@@ -20,12 +20,12 @@ I have not elected to sign the app by joining the Apple Developer Program yet. T
 
 ### Build
 
-To build, run the release task from `Taskfile.dist.yaml`.
+Xcode is required to build the app. Run the release task from `Taskfile.dist.yaml`.
 
 ```sh
 task build:release # build only
 
-task run:release # build release and run the app from the repo directory
+task copy:release # build and copy the app to /Applications
 ```
 
 Open the app `build/Build/Products/Release/Appresize.app`. 

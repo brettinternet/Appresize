@@ -70,6 +70,12 @@ tasks:
     cmds:
       - task: open:release
 
+  copy:release:
+    desc: Move the built app release to the Applications folder
+    deps: [build:release]
+    cmds:
+      - cp -r "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app" /Applications/Appresize.app
+
   open:
     desc: Run the built app (Debug)
     cmds:
