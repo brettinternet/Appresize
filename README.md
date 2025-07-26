@@ -10,7 +10,9 @@ Resize & move apps from anywhere on the window with custom modifiers.
 
 ## Releases
 
-I have not elected to sign the app by joining the Apple Developer Program yet. The releases have been self-signed by me and can be installed by bypassing the typical app security on macOS. You're also welcome to build and bundle the app yourself with Xcode. For a signed release, consider installing the [upstream fork's release](https://github.com/finestructure/Hummingbird) (although some features are missing).
+I have not elected to sign the app by joining the Apple Developer Program yet. The releases have been self-signed by me and can be installed by bypassing the typical app security on macOS. You're also welcome to build and bundle the app yourself with Xcode. For a signed release, consider installing a release from the [original repository](https://github.com/finestructure/Hummingbird) (although some features are missing upstream).
+
+### Build
 
 To build, run the release task from `Taskfile.dist.yaml`.
 
@@ -22,6 +24,14 @@ Open the app `build/Build/Products/Release/Appresize.app`.
 
 > [!IMPORTANT]  
 > With a new build, you'll have to quit the previously built app, remove and re-add the app entry in MacOS settings Privacy & Security > Accessibility.
+
+### Unsigned Release
+
+Alternatively, to run the unsigned app, clear the quarantine extended attribute at your own risk.
+
+```
+xattr -dr com.apple.quarantine /Applications/Appresize.app
+```
 
 ## Known Limitations
 
