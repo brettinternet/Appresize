@@ -6,7 +6,13 @@
 
 Resize & move apps from anywhere on the window with custom modifiers.
 
-![settings window](./screenshot.png)
+![move or resize from anywhere on a window](./assets/demo.webp)
+
+When the modifiers are active, the cursor position can resize or move the window from anywhere over the app. The cursor follows the window (although not captured by the screen recorder).
+
+![settings window](./assets/screenshot.png)
+
+You may resize from the nearest corner instead of a left-to-right resize. It's also possible to enable activation by the mouse drag action instead of merely hovering over the window.
 
 ## Releases
 
