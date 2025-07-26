@@ -128,7 +128,7 @@ extension AppDelegate {
         }
         // Check if permissions were just revoked (changed from true to false)
         else if lastPermissionState && !currentPermissionState {
-            log(.warning, "Accessibility permissions revoked - immediately deactivating to prevent system crashes")
+            log(.error, "Accessibility permissions revoked - immediately deactivating to prevent system crashes")
             stateMachine.deactivate()
             showPermissionRevokedAlert()
         }
