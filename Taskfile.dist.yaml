@@ -62,11 +62,21 @@ tasks:
     desc: Build and run the app (Debug)
     deps: [build]
     cmds:
-      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/Appresize.app"
+      - task: open
 
   run:release:
     desc: Build and run the app (Release)
     deps: [build:release]
+    cmds:
+      - task: open:release
+
+  open:
+    desc: Run the built app (Debug)
+    cmds:
+      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/Appresize.app"
+
+  open:release:
+    desc: Run the built app (Release)
     cmds:
       - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app"
 

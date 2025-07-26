@@ -17,7 +17,9 @@ I have not elected to sign the app by joining the Apple Developer Program yet. T
 To build, run the release task from `Taskfile.dist.yaml`.
 
 ```sh
-task build:release
+task build:release # build only
+
+task run # build release and run the app
 ```
 
 Open the app `build/Build/Products/Release/Appresize.app`. 

@@ -123,6 +123,10 @@ class PreferencesController: NSWindowController {
         NSWorkspace.shared.open(url)
     }
     
+    @IBAction func quitClicked(_ sender: Any) {
+        NSApp.terminate(nil)
+    }
+    
     private func setupGitHubLink() {
         let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(githubLinkClicked(_:)))
         githubLink.addGestureRecognizer(clickGesture)

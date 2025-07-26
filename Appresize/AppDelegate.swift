@@ -45,6 +45,13 @@ extension AppDelegate {
     func applicationWillTerminate(_ aNotification: Notification) {
         stopPermissionMonitoring()
     }
+    
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Always show preferences when app is reopened
+        NSApp.activate(ignoringOtherApps: true)
+        preferencesController.showWindow(nil)
+        return false
+    }
 
     override func awakeFromNib() {
         if Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue) {

@@ -44,10 +44,10 @@ func restartApp() {
     let bundlePath = Bundle.main.bundlePath
     log(.debug, "Attempting to restart app at: \(bundlePath)")
     
-    // First try the standard approach
+    // First try the standard approach (without -n since we're single-instance)
     let task = Process()
     task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    task.arguments = ["-n", bundlePath] // -n opens new instance even if already running
+    task.arguments = [bundlePath]
     
     do {
         try task.run()
