@@ -42,19 +42,42 @@ func showRestartPrompt() {
 
 func restartApp() {
     let bundlePath = Bundle.main.bundlePath
-    log(.debug, "Attempting to restart app at: \(bundlePath)")
+    let currentPID = ProcessInfo.processInfo.processIdentifier
+    log(.debug, "Attempting to restart app at: \(bundlePath), current PID: \(currentPID)")
     
-    // First try the standard approach (without -n since we're single-instance)
-    let task = Process()
-    task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    task.arguments = [bundlePath]
+    // Create a shell script that waits for this process to terminate, then launches the app
+    let script = """
+    #!/bin/bash
+    # Wait for the current process to terminate
+    while kill -0 \(currentPID) 2>/dev/null; do
+        sleep 0.1
+    done
+    # Launch the app
+    open "\(bundlePath)"
+    """
     
     do {
-        try task.run()
-        log(.debug, "Restart command executed successfully")
+        // Write the script to a temporary file
+        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("appresize_restart.sh")
+        try script.write(to: tempURL, atomically: true, encoding: .utf8)
         
-        // Give the new instance time to start before terminating
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        // Make it executable
+        let chmodTask = Process()
+        chmodTask.executableURL = URL(fileURLWithPath: "/bin/chmod")
+        chmodTask.arguments = ["+x", tempURL.path]
+        try chmodTask.run()
+        chmodTask.waitUntilExit()
+        
+        // Execute the script in the background
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.arguments = [tempURL.path]
+        try task.run()
+        
+        log(.debug, "Restart script launched successfully")
+        
+        // Terminate this instance
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             log(.debug, "Terminating current instance")
             NSApp.terminate(nil)
         }

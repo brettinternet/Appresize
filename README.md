@@ -19,7 +19,7 @@ To build, run the release task from `Taskfile.dist.yaml`.
 ```sh
 task build:release # build only
 
-task run # build release and run the app
+task run:release # build release and run the app from the repo directory
 ```
 
 Open the app `build/Build/Products/Release/Appresize.app`. 
