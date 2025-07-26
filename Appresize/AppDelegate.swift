@@ -126,6 +126,12 @@ extension AppDelegate {
             showRestartPrompt()
             stopPermissionMonitoring() // Stop monitoring after showing prompt
         }
+        // Check if permissions were just revoked (changed from true to false)
+        else if lastPermissionState && !currentPermissionState {
+            log(.warning, "Accessibility permissions revoked - immediately deactivating to prevent system crashes")
+            stateMachine.deactivate()
+            showPermissionRevokedAlert()
+        }
         
         lastPermissionState = currentPermissionState
     }

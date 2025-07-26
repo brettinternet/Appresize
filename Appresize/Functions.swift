@@ -39,6 +39,29 @@ func showRestartPrompt() {
     }
 }
 
+func showPermissionRevokedAlert() {
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = "Accessibility permissions revoked"
+    alert.informativeText = """
+    Appresize has detected that accessibility permissions were removed.
+    
+    Window management has been automatically disabled to prevent system instability.
+    
+    To re-enable window management, please grant accessibility permissions again in System Settings.
+    """
+    alert.addButton(withTitle: "Open System Settings")
+    alert.addButton(withTitle: "OK")
+    
+    switch alert.runModal() {
+    case .alertFirstButtonReturn:
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    default:
+        break
+    }
+}
+
 
 func restartApp() {
     let bundlePath = Bundle.main.bundlePath
