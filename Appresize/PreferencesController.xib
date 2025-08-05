@@ -8,6 +8,7 @@
         <customObject id="-2" userLabel="File's Owner" customClass="PreferencesController" customModule="Appresize" customModuleProvider="target">
             <connections>
                 <outlet property="accessibilityStatusLabel" destination="jFx-3h-BvR" id="accessibilityStatusLabel-outlet"/>
+                <outlet property="enableWindowTiling" destination="enableWindowTiling-button" id="enableWindowTiling-outlet"/>
                 <outlet property="githubLink" destination="github-attribution-link" id="github-link-outlet"/>
                 <outlet property="launchAtLogin" destination="TnR-QZ-Jig" id="launchAtLogin-outlet"/>
                 <outlet property="moveAlt" destination="Sj9-Rc-bDN" id="UaS-BH-HzV"/>
@@ -34,7 +35,7 @@
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
             <rect key="contentRect" x="196" y="240" width="412" height="271"/>
-            <rect key="screenRect" x="0.0" y="0.0" width="2560" height="1415"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1728" height="1079"/>
             <view key="contentView" wantsLayer="YES" id="se5-gp-TjO">
                 <rect key="frame" x="0.0" y="0.0" width="412" height="271"/>
                 <autoresizingMask key="autoresizingMask"/>
@@ -170,52 +171,6 @@
                             </subviews>
                         </view>
                     </box>
-                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="bBy-AW-VTy">
-                        <rect key="frame" x="234" y="207" width="198" height="18"/>
-                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <string key="toolTip">When enabled, window resizes will use the corner closest to your cursor. When disabled, resizes always use the bottom-right corner.</string>
-                        <buttonCell key="cell" type="check" title="Resize from corners" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="Bo4-fU-O3J">
-                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
-                            <font key="font" metaFont="system"/>
-                        </buttonCell>
-                        <connections>
-                            <action selector="resizeFromNearestCornerClicked:" target="-2" id="WcX-aB-Oy4"/>
-                        </connections>
-                    </button>
-                    <button toolTip="Shows or hides the Appresize icon in the menu bar. Use the menu bar icon to access preferences and quit the app." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="pNU-or-TOn">
-                        <rect key="frame" x="234" y="181" width="198" height="18"/>
-                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <buttonCell key="cell" type="check" title="Show menu icon" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="veU-QV-ewB">
-                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
-                            <font key="font" metaFont="system"/>
-                        </buttonCell>
-                        <connections>
-                            <action selector="hideMenuIconClicked:" target="-2" id="mNd-W0-MRv"/>
-                        </connections>
-                    </button>
-                    <button toolTip="Automatically starts Appresize when you log in to your Mac. The app will run in the background and be ready to use immediately." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TnR-QZ-Jig">
-                        <rect key="frame" x="234" y="156" width="198" height="18"/>
-                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <buttonCell key="cell" type="check" title="Launch at login" bezelStyle="regularSquare" imagePosition="left" inset="2" id="cdX-Sz-m46">
-                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
-                            <font key="font" metaFont="system"/>
-                        </buttonCell>
-                        <connections>
-                            <action selector="launchAtLoginClicked:" target="-2" id="zdc-Vu-QfP"/>
-                        </connections>
-                    </button>
-                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dTt-aK-ndS">
-                        <rect key="frame" x="234" y="131" width="226" height="18"/>
-                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <string key="toolTip">When enabled, windows will only resize or move when you drag the mouse while holding modifiers. When disabled, windows respond to any mouse movement while modifiers are held.</string>
-                        <buttonCell key="cell" type="check" title="Require mouse drag" bezelStyle="regularSquare" imagePosition="left" inset="2" id="jAC-Hd-tRx">
-                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
-                            <font key="font" metaFont="system"/>
-                        </buttonCell>
-                        <connections>
-                            <action selector="requireDragToActivateClicked:" target="-2" id="CJ8-P0-zVB"/>
-                        </connections>
-                    </button>
                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" preferredMaxLayoutWidth="236" translatesAutoresizingMaskIntoConstraints="NO" id="jFx-3h-BvR">
                         <rect key="frame" x="18" y="70" width="216" height="17"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
@@ -264,6 +219,63 @@
                         </buttonCell>
                         <connections>
                             <action selector="openSystemSettingsClicked:" target="-2" id="8jG-4k-m5H"/>
+                        </connections>
+                    </button>
+                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="bBy-AW-VTy">
+                        <rect key="frame" x="234" y="220" width="198" height="18"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <string key="toolTip">When enabled, window resizes will use the corner closest to your cursor. When disabled, resizes always use the bottom-right corner.</string>
+                        <buttonCell key="cell" type="check" title="Resize from corners" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="Bo4-fU-O3J">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="resizeFromNearestCornerClicked:" target="-2" id="WcX-aB-Oy4"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Shows or hides the Appresize icon in the menu bar. Use the menu bar icon to access preferences and quit the app." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="pNU-or-TOn">
+                        <rect key="frame" x="234" y="194" width="198" height="18"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Show menu icon" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="veU-QV-ewB">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="hideMenuIconClicked:" target="-2" id="mNd-W0-MRv"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Automatically starts Appresize when you log in to your Mac. The app will run in the background and be ready to use immediately." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TnR-QZ-Jig">
+                        <rect key="frame" x="234" y="169" width="198" height="18"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Launch at login" bezelStyle="regularSquare" imagePosition="left" inset="2" id="cdX-Sz-m46">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="launchAtLoginClicked:" target="-2" id="zdc-Vu-QfP"/>
+                        </connections>
+                    </button>
+                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dTt-aK-ndS">
+                        <rect key="frame" x="234" y="144" width="226" height="18"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <string key="toolTip">When enabled, windows will only resize or move when you drag the mouse while holding modifiers. When disabled, windows respond to any mouse movement while modifiers are held.</string>
+                        <buttonCell key="cell" type="check" title="Require mouse drag" bezelStyle="regularSquare" imagePosition="left" inset="2" id="jAC-Hd-tRx">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="requireDragToActivateClicked:" target="-2" id="CJ8-P0-zVB"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Enables window tiling when windows are dragged to screen edges, similar to native macOS window snapping." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="enableWindowTiling-button">
+                        <rect key="frame" x="234" y="118" width="198" height="18"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Enable window tiling" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="enableWindowTiling-cell">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="enableWindowTilingClicked:" target="-2" id="enableWindowTiling-action"/>
                         </connections>
                     </button>
                 </subviews>

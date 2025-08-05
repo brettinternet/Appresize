@@ -166,11 +166,18 @@ class Tracker {
                 case (.resizing, .resizing):
                     resize(delta: event.mouseDelta)
                     return true  // Block all mouse events while resizing
-                case (.moving, .idle), (.resizing, .idle):
+                case (.moving, .idle):
+                    // Check for tiling when moving ends
+                    checkForTiling(at: event.location)
+                    currentState = nextState
+                    lastEventTime = 0  // Reset timer when returning to idle
+                    return true  // Block the final event that ends the operation
+                case (.resizing, .idle):
                     currentState = nextState
                     lastEventTime = 0  // Reset timer when returning to idle
                     return true  // Block the final event that ends the operation
                 case (.moving, .resizing):
+                    TilingPreview.hidePreview()
                     startTracking(at: event.location)
                     currentState = nextState
                     return true  // Block transition events
@@ -208,8 +215,12 @@ class Tracker {
             case (.moving, .moving):
                 move(delta: event.mouseDelta)
                 absortEvent = true  // Block default actions while moving
-            case (.moving, .idle),
-                 (.moving, .resizing):
+            case (.moving, .idle):
+                // Check for tiling when moving ends
+                checkForTiling(at: event.location)
+                break
+            case (.moving, .resizing):
+                TilingPreview.hidePreview()
                 break
 
             // .resizing -> X
@@ -270,6 +281,15 @@ class Tracker {
         }
 
         trackingInfo.origin += delta
+        
+        // Update tiling preview if window tiling is enabled (do this every move, not just filtered)
+        if Current.defaults().bool(forKey: DefaultsKeys.enableWindowTiling.rawValue) {
+            let currentMouseLocation = NSEvent.mouseLocation
+            print("🔵 Tracker: Updating tiling preview, mouse at: \(currentMouseLocation)")
+            TilingPreview.updatePreview(at: currentMouseLocation)
+        } else {
+            print("🔵 Tracker: Window tiling disabled, not updating preview")
+        }
 
         guard (CACurrentMediaTime() - trackingInfo.time) > Tracker.moveFilterInterval else { return }
 
@@ -309,6 +329,23 @@ class Tracker {
         }
 
         trackingInfo.time = CACurrentMediaTime()
+    }
+    
+    
+    private func checkForTiling(at location: CGPoint) {
+        // Always hide the preview when movement ends
+        TilingPreview.hidePreview()
+        
+        guard let window = trackingInfo.window else {
+            log(.debug, "🔴 checkForTiling: No window found")
+            return
+        }
+        
+        log(.debug, "🟡 checkForTiling: Checking tiling at location: \(location)")
+        
+        // Apply tiling if the window was moved near a screen edge
+        let didTile = WindowTiling.applyTiling(to: window, at: location)
+        log(.debug, didTile ? "🟢 Tiling applied!" : "🟡 No tiling applied")
     }
 
 }

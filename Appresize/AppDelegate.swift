@@ -25,6 +25,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // App lifecycle
 extension AppDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Register default preferences
+        Current.defaults().register(defaults: DefaultPreferences)
+        
         if Date(forKey: .firstLaunched, defaults: Current.defaults()) == nil {
             try? Current.date().save(forKey: .firstLaunched, defaults: Current.defaults())
         }

@@ -27,6 +27,7 @@ class PreferencesController: NSWindowController {
     @IBOutlet weak var showMenuIcon: NSButton!
     @IBOutlet weak var launchAtLogin: NSButton!
     @IBOutlet weak var requireDragToActivate: NSButton!
+    @IBOutlet weak var enableWindowTiling: NSButton!
 
     @IBOutlet weak var versionLabel: NSTextField!
     @IBOutlet weak var accessibilityStatusLabel: NSTextField!
@@ -118,6 +119,16 @@ class PreferencesController: NSWindowController {
         updateCopy()
     }
     
+    @IBAction func enableWindowTilingClicked(_ sender: Any) {
+        let value: NSNumber = {
+            var v = Current.defaults().bool(forKey: DefaultsKeys.enableWindowTiling.rawValue)
+            v.toggle()
+            return NSNumber(booleanLiteral: v)
+        }()
+        Current.defaults().set(value, forKey: DefaultsKeys.enableWindowTiling.rawValue)
+        updateCopy()
+    }
+    
     @IBAction func openSystemSettingsClicked(_ sender: Any) {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
@@ -200,6 +211,9 @@ extension PreferencesController: NSWindowDelegate {
             ? .on : .off
 
         requireDragToActivate?.state = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
+            ? .on : .off
+
+        enableWindowTiling?.state = Current.defaults().bool(forKey: DefaultsKeys.enableWindowTiling.rawValue)
             ? .on : .off
 
         updateAccessibilityStatus()

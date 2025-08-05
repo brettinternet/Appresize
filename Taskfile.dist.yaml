@@ -27,42 +27,41 @@ tasks:
 
   build:
     desc: Build the app (Debug)
-    cmds:
-      - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" build
+    cmd: xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" build
 
   build:release:
     desc: Build the app (Release)
-    cmds:
-      - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" build
+    cmd: xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" build
 
   test:build:
     desc: Build tests
-    cmds:
-      - xcodebuild build-for-testing -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
+    cmd: xcodebuild build-for-testing -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
 
   test:
     desc: Run all tests
     deps: [test:build]
-    cmds:
-      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
+    cmd: xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
 
   test:unit:
     desc: Run unit tests only (excludes tests that require system permissions)
     deps: [test:build]
-    cmds:
-      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests/ModifierTests
+    cmd: xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests/ModifierTests
 
   test:all:
     desc: Run all tests (may require manual interaction for permissions)
     deps: [test:build]
-    cmds:
-      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests
+    cmd: xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests
 
   run:
     desc: Build and run the app (Debug)
     deps: [build]
     cmds:
       - task: open
+
+  log:
+    aliases: [logs]
+    desc: Read logs from the app
+    cmd: log stream --process Appresize --level debug
 
   run:release:
     desc: Build and run the app (Release)
@@ -73,23 +72,19 @@ tasks:
   copy:release:
     desc: Move the built app release to the Applications folder
     deps: [build:release]
-    cmds:
-      - cp -r "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app" /Applications/Appresize.app
+    cmd: cp -r "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app" /Applications/Appresize.app
 
   open:
     desc: Run the built app (Debug)
-    cmds:
-      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/Appresize.app"
+    cmd: open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/Appresize.app"
 
   open:release:
     desc: Run the built app (Release)
-    cmds:
-      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app"
+    cmd: open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app"
 
   archive:
     desc: Create an archive for distribution
-    cmds:
-      - xcodebuild archive -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" -archivePath "{{.BUILD_DIR}}/Appresize.xcarchive"
+    cmd: xcodebuild archive -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" -archivePath "{{.BUILD_DIR}}/Appresize.xcarchive"
 
   dev:
     desc: Quick development cycle (clean, build, test)
