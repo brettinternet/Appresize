@@ -177,7 +177,6 @@ class Tracker {
                     lastEventTime = 0  // Reset timer when returning to idle
                     return true  // Block the final event that ends the operation
                 case (.moving, .resizing):
-                    TilingPreview.hidePreview()
                     startTracking(at: event.location)
                     currentState = nextState
                     return true  // Block transition events
@@ -220,7 +219,6 @@ class Tracker {
                 checkForTiling(at: event.location)
                 break
             case (.moving, .resizing):
-                TilingPreview.hidePreview()
                 break
 
             // .resizing -> X
@@ -282,15 +280,6 @@ class Tracker {
 
         trackingInfo.origin += delta
         
-        // Update tiling preview if window tiling is enabled (do this every move, not just filtered)
-        if Current.defaults().bool(forKey: DefaultsKeys.enableWindowTiling.rawValue) {
-            let currentMouseLocation = NSEvent.mouseLocation
-            print("🔵 Tracker: Updating tiling preview, mouse at: \(currentMouseLocation)")
-            TilingPreview.updatePreview(at: currentMouseLocation)
-        } else {
-            print("🔵 Tracker: Window tiling disabled, not updating preview")
-        }
-
         guard (CACurrentMediaTime() - trackingInfo.time) > Tracker.moveFilterInterval else { return }
 
         window.origin = trackingInfo.origin
@@ -333,9 +322,6 @@ class Tracker {
     
     
     private func checkForTiling(at location: CGPoint) {
-        // Always hide the preview when movement ends
-        TilingPreview.hidePreview()
-        
         guard let window = trackingInfo.window else {
             log(.debug, "🔴 checkForTiling: No window found")
             return
