@@ -3,6 +3,14 @@ import os
 import UserNotifications
 
 
+func isLoginItemLaunch(_ event: NSAppleEventDescriptor?) -> Bool {
+    guard let event = event, event.eventID == kAEOpenApplication else {
+        return false
+    }
+    return event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+}
+
+
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -19,11 +27,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var stateMachine = AppStateMachine()
     private var permissionMonitorTimer: Timer?
     private var lastPermissionState = false
+    private var launchedAsLoginItem = false
 }
 
 
 // App lifecycle
 extension AppDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        launchedAsLoginItem = isLoginItemLaunch(NSAppleEventManager.shared().currentAppleEvent)
+    }
+
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         if Date(forKey: .firstLaunched, defaults: Current.defaults()) == nil {
             try? Current.date().save(forKey: .firstLaunched, defaults: Current.defaults())
@@ -40,6 +54,12 @@ extension AppDelegate {
         lastPermissionState = isTrusted(prompt: false)
         startPermissionMonitoring()
         stateMachine.state = .validatingState
+
+        if !Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue),
+           !launchedAsLoginItem {
+            NSApp.activate(ignoringOtherApps: true)
+            preferencesController.showWindow(nil)
+        }
     }
     
     func applicationWillTerminate(_ aNotification: Notification) {
@@ -56,10 +76,6 @@ extension AppDelegate {
     override func awakeFromNib() {
         if Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue) {
             addStatusItemToMenubar()
-        } else {
-            NSApp.activate(ignoringOtherApps: true)
-            preferencesController.showWindow(nil)
-            return
         }
     }
 }

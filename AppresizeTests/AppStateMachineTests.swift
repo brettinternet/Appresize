@@ -36,6 +36,38 @@ class AppStateMachineTests: XCTestCase {
 }
 
 
+class AppDelegateLaunchTests: XCTestCase {
+
+    func test_login_item_open_event_is_detected() {
+        let event = openApplicationEvent()
+        event.setParam(
+            NSAppleEventDescriptor(enumCode: keyAELaunchedAsLogInItem),
+            forKeyword: keyAEPropData
+        )
+
+        XCTAssertTrue(isLoginItemLaunch(event))
+    }
+
+    func test_manual_open_event_is_not_detected_as_login_item() {
+        XCTAssertFalse(isLoginItemLaunch(openApplicationEvent()))
+    }
+
+    func test_missing_launch_event_is_not_detected_as_login_item() {
+        XCTAssertFalse(isLoginItemLaunch(nil))
+    }
+
+    private func openApplicationEvent() -> NSAppleEventDescriptor {
+        NSAppleEventDescriptor(
+            eventClass: AEEventClass(kCoreEventClass),
+            eventID: AEEventID(kAEOpenApplication),
+            targetDescriptor: nil,
+            returnID: AEReturnID(kAutoGenerateReturnID),
+            transactionID: AETransactionID(kAnyTransactionID)
+        )
+    }
+}
+
+
 // MARK:- Helpers
 
 
