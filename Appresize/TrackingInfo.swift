@@ -15,4 +15,12 @@ class TrackingInfo {
     var origin: CGPoint = .zero
     var size: CGSize = .zero
     var corner: Corner = .bottomRight
+
+    func reset() {
+        time = 0
+        window = nil
+        origin = .zero
+        size = .zero
+        corner = .bottomRight
+    }
 }

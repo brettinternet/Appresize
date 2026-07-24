@@ -1,4 +1,5 @@
 import Cocoa
+import ServiceManagement
 
 
 protocol PreferencesControllerDelegate: AnyObject {
@@ -38,6 +39,7 @@ class PreferencesController: NSWindowController {
     override func windowDidLoad() {
         super.windowDidLoad()
         updateAccessibilityStatus()
+        updateLaunchAtLoginState()
         updateCopy()
         setupGitHubLink()
     }
@@ -45,6 +47,7 @@ class PreferencesController: NSWindowController {
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
         updateAccessibilityStatus()
+        updateLaunchAtLoginState()
         updateCopy()
         startPermissionMonitoring()
     }
@@ -63,11 +66,25 @@ class PreferencesController: NSWindowController {
             if moveButtons.contains(sender) {
                 let modifiers = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
                 let m = Modifiers<Move>(rawValue: modifier)
-                try? modifiers.toggle(m).save(forKey: .moveModifiers, defaults: Current.defaults())
+                let updated = modifiers.toggle(m)
+                let resize = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
+                guard !modifierBindingsConflict(move: updated, resize: resize) else {
+                    sender.state = modifiers.contains(m) ? .on : .off
+                    NSSound.beep()
+                    return
+                }
+                try? updated.save(forKey: .moveModifiers, defaults: Current.defaults())
             } else if resizeButtons.contains(sender) {
                 let modifiers = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
                 let m = Modifiers<Resize>(rawValue: modifier)
-                try? modifiers.toggle(m).save(forKey: .resizeModifiers, defaults: Current.defaults())
+                let updated = modifiers.toggle(m)
+                let move = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
+                guard !modifierBindingsConflict(move: move, resize: updated) else {
+                    sender.state = modifiers.contains(m) ? .on : .off
+                    NSSound.beep()
+                    return
+                }
+                try? updated.save(forKey: .resizeModifiers, defaults: Current.defaults())
             }
             Tracker.shared?.readModifiers()
         }
@@ -97,13 +114,14 @@ class PreferencesController: NSWindowController {
     }
     
     @IBAction func launchAtLoginClicked(_ sender: Any) {
-        let value: NSNumber = {
-            var v = Current.defaults().bool(forKey: DefaultsKeys.launchAtLogin.rawValue)
-            v.toggle()
-            return NSNumber(booleanLiteral: v)
-        }()
-        Current.defaults().set(value, forKey: DefaultsKeys.launchAtLogin.rawValue)
-        setLaunchAtLogin(value.boolValue)
+        let requestedState = !isLaunchAtLoginEnabled()
+        let result = setLaunchAtLogin(requestedState)
+        if case .requiresApproval = result {
+            showLoginItemApprovalAlert()
+        } else if case .failed = result {
+            showLoginItemFailureAlert()
+        }
+        updateLaunchAtLoginState()
         updateCopy()
     }
     
@@ -119,8 +137,7 @@ class PreferencesController: NSWindowController {
     }
     
     @IBAction func openSystemSettingsClicked(_ sender: Any) {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
+        NSWorkspace.shared.open(Links.securitySystemPreferences)
     }
     
     @IBAction func quitClicked(_ sender: Any) {
@@ -196,8 +213,7 @@ extension PreferencesController: NSWindowDelegate {
         showMenuIcon?.state = Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue)
             ? .on : .off
 
-        launchAtLogin?.state = Current.defaults().bool(forKey: DefaultsKeys.launchAtLogin.rawValue)
-            ? .on : .off
+        updateLaunchAtLoginState()
 
         requireDragToActivate?.state = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
             ? .on : .off
@@ -226,6 +242,32 @@ extension PreferencesController: NSWindowDelegate {
             : "Resizing will act on the lower right corner of the window."
 
         versionLabel?.stringValue = appVersion(short: true)
+    }
+
+    private func updateLaunchAtLoginState() {
+        let enabled = isLaunchAtLoginEnabled()
+        Current.defaults().set(enabled, forKey: DefaultsKeys.launchAtLogin.rawValue)
+        launchAtLogin?.state = enabled ? .on : .off
+    }
+
+    private func showLoginItemApprovalAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Allow Appresize in Login Items"
+        alert.informativeText = "Open System Settings → General → Login Items and allow Appresize."
+        alert.addButton(withTitle: "Open Login Items")
+        alert.addButton(withTitle: "Later")
+        if alert.runModal() == .alertFirstButtonReturn {
+            SMAppService.openSystemSettingsLoginItems()
+        }
+    }
+
+    private func showLoginItemFailureAlert() {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Could not update Login Items"
+        alert.informativeText = "Appresize could not change its Login Items setting. Please try again in System Settings → General → Login Items."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
     
     private func startPermissionMonitoring() {

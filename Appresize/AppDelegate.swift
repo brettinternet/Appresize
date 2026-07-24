@@ -74,6 +74,7 @@ extension AppDelegate {
     }
 
     override func awakeFromNib() {
+        registerDefaultPreferences()
         if Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue) {
             addStatusItemToMenubar()
         }
@@ -139,8 +140,10 @@ extension AppDelegate {
         
         // Check if permissions were just granted (changed from false to true)
         if !lastPermissionState && currentPermissionState {
-            showRestartPrompt()
-            stopPermissionMonitoring() // Stop monitoring after showing prompt
+            stateMachine.checkState()
+            if stateMachine.state != .activated {
+                showRestartPrompt()
+            }
         }
         // Check if permissions were just revoked (changed from true to false)
         else if lastPermissionState && !currentPermissionState {

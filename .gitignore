@@ -25,6 +25,8 @@ DerivedData/
 
 ## App packaging
 *.ipa
+*.dmg
+*.xcarchive
 *.dSYM.zip
 *.dSYM
 
@@ -72,10 +74,15 @@ Temporary Items
 AuthKey_*.p8
 
 # Code signing
+*.keychain
+*.p12
 *.mobileprovision
 *.provisionprofile
 
 # Temporary files
+.env
+.env.*
+!.env.example
 *.tmp
 *.temp
 

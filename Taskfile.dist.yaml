@@ -33,7 +33,7 @@ tasks:
   build:release:
     desc: Build the app (Release)
     cmds:
-      - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" build
+      - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "generic/platform=macOS" build
 
   test:build:
     desc: Build tests
@@ -42,19 +42,19 @@ tasks:
 
   test:
     desc: Run all tests
-    deps: [test:build]
+    deps: ["test:build"]
     cmds:
       - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
 
   test:unit:
     desc: Run unit tests only (excludes tests that require system permissions)
-    deps: [test:build]
+    deps: ["test:build"]
     cmds:
-      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests/ModifierTests
+      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests
 
   test:all:
     desc: Run all tests (may require manual interaction for permissions)
-    deps: [test:build]
+    deps: ["test:build"]
     cmds:
       - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests
 
@@ -66,13 +66,13 @@ tasks:
 
   run:release:
     desc: Build and run the app (Release)
-    deps: [build:release]
+    deps: ["build:release"]
     cmds:
       - task: open:release
 
   copy:release:
     desc: Move the built app release to the Applications folder
-    deps: [build:release]
+    deps: ["build:release"]
     cmds:
       - cp -r "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app" /Applications/Appresize.app
 

@@ -11,29 +11,40 @@ extension AXUIElement {
         var element: AXUIElement?
         var selected: AXUIElement?
         let systemwideElement = AXUIElementCreateSystemWide()
+        let timeoutResult = AXUIElementSetMessagingTimeout(systemwideElement, 0.5)
+        if timeoutResult != .success {
+            log(.debug, "Could not set Accessibility messaging timeout: \(timeoutResult.rawValue)")
+            return nil
+        }
 
         withUnsafeMutablePointer(to: &element) { elementPtr in
-            if .success == AXUIElementCopyElementAtPosition(systemwideElement, Float(position.x), Float(position.y), elementPtr) {
-                guard let element = elementPtr.pointee else { return }
-                do {
-                    var role: CFTypeRef?
-                    withUnsafeMutablePointer(to: &role) { rolePtr in
-                        if
-                            .success == AXUIElementCopyAttributeValue(element, NSAccessibility.Attribute.role as CFString, rolePtr),
-                            let r = rolePtr.pointee as? NSAccessibility.Role,
-                            r == .window {
-                            selected = element
-                        }
-                    }
-                }
-                do {
-                    var window: CFTypeRef?
-                    withUnsafeMutablePointer(to: &window) { windowPtr in
-                        if .success == AXUIElementCopyAttributeValue(element, NSAccessibility.Attribute.window as CFString, windowPtr) {
-                            selected = (windowPtr.pointee as! AXUIElement)
-                        }
-                    }
-                }
+            guard AXUIElementCopyElementAtPosition(
+                systemwideElement,
+                Float(position.x),
+                Float(position.y),
+                elementPtr
+            ) == .success,
+            let element = elementPtr.pointee else { return }
+
+            var role: CFTypeRef?
+            let roleResult = withUnsafeMutablePointer(to: &role) { rolePtr in
+                AXUIElementCopyAttributeValue(element, NSAccessibility.Attribute.role as CFString, rolePtr)
+            }
+            if roleResult == .success,
+               let role = role as? NSAccessibility.Role,
+               role == .window {
+                selected = element
+            }
+
+            var window: CFTypeRef?
+            let windowResult = withUnsafeMutablePointer(to: &window) { windowPtr in
+                AXUIElementCopyAttributeValue(element, NSAccessibility.Attribute.window as CFString, windowPtr)
+            }
+            if windowResult == .success,
+               let window,
+               CFGetTypeID(window) == AXUIElementGetTypeID() {
+                // The CF type ID check makes this bridge safe without an unchecked cast.
+                selected = unsafeBitCast(window, to: AXUIElement.self)
             }
         }
 
@@ -51,9 +62,13 @@ extension AXUIElement {
             let success = withUnsafeMutablePointer(to: &ref) { refPtr -> Bool in
                 switch AXUIElementCopyAttributeValue(self, NSAccessibility.Attribute.position as CFString, refPtr) {
                 case .success:
-                    guard let ref = refPtr.pointee else { break }
+                    guard let ref = refPtr.pointee,
+                          CFGetTypeID(ref) == AXValueGetTypeID() else { break }
+                    // The CF type ID check makes this bridge safe without an unchecked cast.
+                    let value = unsafeBitCast(ref, to: AXValue.self)
+                    guard AXValueGetType(value) == .cgPoint else { break }
                     let success = withUnsafeMutablePointer(to: &pos) { ptr in
-                        AXValueGetValue(ref as! AXValue, .cgPoint, ptr)
+                        AXValueGetValue(value, .cgPoint, ptr)
                     }
                     if !success {
                         log(.debug, "ERROR: Could not decode position")
@@ -97,9 +112,13 @@ extension AXUIElement {
             let success = withUnsafeMutablePointer(to: &ref) { refPtr -> Bool in
                 switch AXUIElementCopyAttributeValue(self, NSAccessibility.Attribute.size as CFString, refPtr) {
                 case .success:
-                    guard let ref = refPtr.pointee else { break }
+                    guard let ref = refPtr.pointee,
+                          CFGetTypeID(ref) == AXValueGetTypeID() else { break }
+                    // The CF type ID check makes this bridge safe without an unchecked cast.
+                    let value = unsafeBitCast(ref, to: AXValue.self)
+                    guard AXValueGetType(value) == .cgSize else { break }
                     let success = withUnsafeMutablePointer(to: &size) { sizePtr in
-                        AXValueGetValue(ref as! AXValue, .cgSize, sizePtr)
+                        AXValueGetValue(value, .cgSize, sizePtr)
                     }
                     if !success {
                         log(.debug, "ERROR: Could not decode size")

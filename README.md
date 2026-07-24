@@ -23,7 +23,7 @@ The releases are [built and published by a GitHub Action](https://github.com/bre
 
 ### Build
 
-Xcode is required to build the app. Run the release task from `Taskfile.dist.yaml`.
+Appresize requires macOS 15.2 or newer. Xcode is required to build the app. Run the release task from `Taskfile.dist.yaml`.
 
 ```sh
 task build:release # build only

@@ -21,6 +21,11 @@ let DefaultPreferences = [
 ]
 
 
+func registerDefaultPreferences(in defaults: UserDefaults = Current.defaults()) {
+    defaults.register(defaults: DefaultPreferences)
+}
+
+
 protocol Defaultable {
     static var defaultValue: Any { get }
     init?(forKey: DefaultsKeys, defaults: UserDefaults)

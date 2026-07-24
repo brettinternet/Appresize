@@ -22,7 +22,12 @@ class Tracker {
             log(.debug, "❌ Cannot enable tracker: accessibility not trusted")
             return
         }
-        shared = try? .init()
+        do {
+            shared = try .init()
+        } catch {
+            shared = nil
+            log(.error, "Could not create mouse event tap: \(error)")
+        }
     }
 
     static func disable() {
@@ -47,6 +52,7 @@ class Tracker {
     private var requireDragToActivate: Bool = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
     private var accessibilityMonitorTimer: Timer?
     private var lastEventTime: CFAbsoluteTime = 0
+    private var activeDragButton: Int64?
     private static let maxEventAbsorptionTime: CFAbsoluteTime = 5.0  // Max 5 seconds of continuous absorption
 
 
@@ -117,6 +123,7 @@ class Tracker {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             // need to re-enable our eventTap (We got disabled. Usually happens on a slow resizing app)
             log(.debug, "Re-enabling")
+            resetTrackingState()
             #if !TEST
             // Double-check permissions before re-enabling
             guard isTrusted(prompt: false) else {
@@ -131,14 +138,28 @@ class Tracker {
             return false
         }
 
-        if moveModifiers.isEmpty && resizeModifiers.isEmpty { return false }
-
         // Check if we should respond to this event type based on drag-only setting
         let isDragEvent = type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged
         let isMoveEvent = type == .mouseMoved
         let isMouseButtonEvent = type == .leftMouseDown || type == .leftMouseUp || 
                                 type == .rightMouseDown || type == .rightMouseUp ||
                                 type == .otherMouseDown || type == .otherMouseUp
+        let isMouseUp = type == .leftMouseUp || type == .rightMouseUp || type == .otherMouseUp
+
+        // Drag-only mode must not consume button transitions. Once a drag has
+        // actually started, use its button to identify the matching mouse-up
+        // and end the operation before the up event reaches the system.
+        if requireDragToActivate {
+            if isMouseUp,
+               let storedButton = activeDragButton,
+               event.getIntegerValueField(.mouseEventButtonNumber) == storedButton {
+                resetTrackingState()
+                return false
+            }
+            if isMouseButtonEvent { return false }
+        }
+
+        if moveModifiers.isEmpty && resizeModifiers.isEmpty { return false }
         
         // If we're currently in an active state (moving or resizing), absorb all mouse events
         // to prevent default actions like text selection
@@ -148,8 +169,7 @@ class Tracker {
             // Safety timeout: if we've been absorbing events for too long, reset to idle
             if lastEventTime > 0 && (currentTime - lastEventTime) > Self.maxEventAbsorptionTime {
                 log(.error, "⚠️ Event absorption timeout - resetting to idle state to prevent system freeze")
-                currentState = .idle
-                lastEventTime = 0
+                resetTrackingState()
                 return false
             }
             
@@ -167,15 +187,20 @@ class Tracker {
                     resize(delta: event.mouseDelta)
                     return true  // Block all mouse events while resizing
                 case (.moving, .idle), (.resizing, .idle):
-                    currentState = nextState
-                    lastEventTime = 0  // Reset timer when returning to idle
-                    return true  // Block the final event that ends the operation
+                    resetTrackingState()
+                    return isMouseButtonEvent ? false : true  // Pass button transitions through
                 case (.moving, .resizing):
-                    startTracking(at: event.location)
+                    guard startTracking(at: event.location) else {
+                        resetTrackingState()
+                        return false
+                    }
                     currentState = nextState
                     return true  // Block transition events
                 case (.resizing, .moving):
-                    startTracking(at: event.location)
+                    guard startTracking(at: event.location) else {
+                        resetTrackingState()
+                        return false
+                    }
                     currentState = nextState
                     return true  // Block transition events
                 default:
@@ -191,7 +216,7 @@ class Tracker {
             return false  // In normal mode, respond to both move and drag events
         }
 
-        var absortEvent = false
+        var absorbEvent = false
         let nextState = state(for: event.flags)
 
         switch (currentState, nextState) {
@@ -201,13 +226,19 @@ class Tracker {
                 break
             case (.idle, .moving),
                  (.idle, .resizing):
-                startTracking(at: event.location)
-                absortEvent = true
+                guard startTracking(at: event.location) else {
+                    resetTrackingState()
+                    return false
+                }
+                if requireDragToActivate {
+                    activeDragButton = event.getIntegerValueField(.mouseEventButtonNumber)
+                }
+                absorbEvent = true
 
             // .moving -> X
             case (.moving, .moving):
                 move(delta: event.mouseDelta)
-                absortEvent = true  // Block default actions while moving
+                absorbEvent = true  // Block default actions while moving
             case (.moving, .idle),
                  (.moving, .resizing):
                 break
@@ -216,20 +247,37 @@ class Tracker {
             case (.resizing, .idle):
                 break
             case (.resizing, .moving):
-                startTracking(at: event.location)
-                absortEvent = true
+                guard startTracking(at: event.location) else {
+                    resetTrackingState()
+                    return false
+                }
+                if requireDragToActivate {
+                    activeDragButton = event.getIntegerValueField(.mouseEventButtonNumber)
+                }
+                absorbEvent = true
             case (.resizing, .resizing):
                 resize(delta: event.mouseDelta)
-                absortEvent = true  // Block default actions while resizing
+                absorbEvent = true  // Block default actions while resizing
         }
 
         currentState = nextState
 
-        return absortEvent
+        return absorbEvent
+    }
+
+
+    private func resetTrackingState() {
+        currentState = .idle
+        lastEventTime = 0
+        activeDragButton = nil
+        trackingInfo.reset()
     }
 
 
     private func state(for modifiers: CGEventFlags) -> State {
+        guard !modifierBindingsConflict(move: moveModifiers, resize: resizeModifiers) else {
+            return .idle
+        }
         if moveModifiers.exclusivelySet(in: modifiers) {
             return .moving
         }
@@ -240,17 +288,20 @@ class Tracker {
     }
 
 
-    private func startTracking(at location: CGPoint) {
+    @discardableResult
+    private func startTracking(at location: CGPoint) -> Bool {
+        trackingInfo.reset()
+
         guard isTrusted(prompt: false) else {
             log(.debug, "❌ Accessibility not trusted, cannot track window")
-            return
+            return false
         }
         
         guard
             let trackedWindow = AXUIElement.window(at: location),
             let origin = trackedWindow.origin,
             let size = trackedWindow.size
-        else { return }
+        else { return false }
         trackingInfo.time = CACurrentMediaTime()
         trackingInfo.window = trackedWindow
         trackingInfo.origin = origin
@@ -260,6 +311,7 @@ class Tracker {
         } else {
             trackingInfo.corner = .bottomRight
         }
+        return true
     }
 
 

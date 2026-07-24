@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   release:
@@ -22,50 +21,54 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: List available Xcode versions
-        run: ls -la /Applications/ | grep Xcode
-
-      - name: Select Xcode version
-        run: |
-          # Try to use the newest available Xcode version
-          if [ -d "/Applications/Xcode_16.1.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_16.0.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_15.4.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-          else
-            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          fi
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Cache derived data
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Developer/Xcode/DerivedData
-          key: ${{ runner.os }}-derived-data-${{ hashFiles('**/*.xcodeproj') }}
-          restore-keys: |
-            ${{ runner.os }}-derived-data-
+      - name: Build tests
+        run: |
+          xcodebuild build-for-testing \
+                     -project Appresize.xcodeproj \
+                     -scheme Appresize \
+                     -configuration Debug \
+                     -derivedDataPath build \
+                     -destination 'platform=macOS'
 
-      - name: Build app
+      - name: Run tests
+        timeout-minutes: 5
+        run: |
+          xcodebuild test-without-building \
+                     -project Appresize.xcodeproj \
+                     -scheme Appresize \
+                     -configuration Debug \
+                     -derivedDataPath build \
+                     -destination 'platform=macOS' \
+                     -only-testing:AppresizeTests
+
+      - name: Build release
         run: |
           xcodebuild -project Appresize.xcodeproj \
                      -scheme Appresize \
                      -configuration Release \
                      -derivedDataPath build \
+                     -destination 'generic/platform=macOS' \
                      build
 
-      - name: Show build products
+      - name: Verify release
         run: |
-          echo "Build products:"
-          find build -name "*.app" -type d
-          ls -la build/Build/Products/Release/
+          APP_PATH="build/Build/Products/Release/Appresize.app"
+          BINARY_PATH="$APP_PATH/Contents/MacOS/Appresize"
+          ARCHS="$(lipo -archs "$BINARY_PATH")"
+          [[ "$ARCHS" == *arm64* && "$ARCHS" == *x86_64* ]]
+          codesign --verify --deep --strict "$APP_PATH"
+          codesign -d --verbose=4 "$APP_PATH" 2>&1 | grep 'flags=.*runtime'
 
       - name: Create DMG
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
         run: |
           # Create a temporary directory for DMG contents
           mkdir -p dmg-staging
@@ -80,7 +83,7 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             VERSION=${GITHUB_REF#refs/tags/}
           else
-            VERSION=${{ github.event.inputs.version }}
+            VERSION="$RELEASE_VERSION"
           fi
 
           # Create DMG
@@ -92,18 +95,8 @@ jobs:
           # Verify DMG was created
           ls -la Appresize-*.dmg
 
-      - name: Sign DMG (if certificates available)
-        if: env.APPLE_CERTIFICATE_DATA != ''
-        env:
-          APPLE_CERTIFICATE_DATA: ${{ secrets.APPLE_CERTIFICATE_DATA }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          # This would handle code signing if certificates are provided
-          echo "Code signing would happen here if certificates were configured"
-
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: appresize-build
           path: |
@@ -112,7 +105,7 @@ jobs:
 
       - name: Create Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             Appresize-*.dmg
@@ -123,14 +116,16 @@ jobs:
 
             ## Installation
 
+            > This release is ad-hoc signed, not Developer ID signed or notarized. Review the repository README before bypassing macOS Gatekeeper.
+
             1. Download the DMG file below
             2. Open the DMG and drag Appresize to your Applications folder
             3. Launch Appresize from Applications
-            4. Grant accessibility permissions when prompted in System Preferences
+            4. Grant accessibility permissions when prompted in System Settings
 
             ## Requirements
 
-            - macOS 10.15 or later
+            - macOS 15.2 or later
             - Accessibility permissions for window manipulation
           draft: false
           prerelease: false
@@ -139,7 +134,7 @@ jobs:
 
       - name: Create Manual Release
         if: github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ github.event.inputs.version }}
           name: Release ${{ github.event.inputs.version }}
@@ -152,14 +147,16 @@ jobs:
 
             ## Installation
 
+            > This release is ad-hoc signed, not Developer ID signed or notarized. Review the repository README before bypassing macOS Gatekeeper.
+
             1. Download the DMG file below
             2. Open the DMG and drag Appresize to your Applications folder
             3. Launch Appresize from Applications
-            4. Grant accessibility permissions when prompted in System Preferences
+            4. Grant accessibility permissions when prompted in System Settings
 
             ## Requirements
 
-            - macOS 10.15 or later
+            - macOS 15.2 or later
             - Accessibility permissions for window manipulation
           draft: false
           prerelease: false

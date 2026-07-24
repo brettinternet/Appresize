@@ -8,10 +8,10 @@ func showAccessibilityAlert() {
     alert.informativeText = """
     Appresize requires Accessibility permissions in order to be able to move and resize windows for you.
 
-    You can grant Accessibility permissions in "System Preferences" → "Security & Privacy" → "Accessibility".
+    You can grant Accessibility permission in System Settings → Privacy & Security → Accessibility.
 
     """
-    alert.addButton(withTitle: "Open System Preferences")
+    alert.addButton(withTitle: "Open System Settings")
     switch alert.runModal() {
     case .alertFirstButtonReturn:
         NSWorkspace.shared.open(Links.securitySystemPreferences)
@@ -23,11 +23,11 @@ func showAccessibilityAlert() {
 
 func showRestartPrompt() {
     let alert = NSAlert()
-    alert.messageText = "Accessibility permissions granted!"
+    alert.messageText = "Restart required"
     alert.informativeText = """
-    Appresize now has the required permissions to manage windows.
-    
-    Please restart the app to activate window management functionality.
+    Appresize has Accessibility permission, but window management could not be activated.
+
+    Restart the app to try again.
     """
     alert.addButton(withTitle: "Restart App")
     alert.addButton(withTitle: "Later")
@@ -55,8 +55,7 @@ func showPermissionRevokedAlert() {
     
     switch alert.runModal() {
     case .alertFirstButtonReturn:
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
+        NSWorkspace.shared.open(Links.securitySystemPreferences)
     default:
         break
     }
@@ -67,38 +66,24 @@ func restartApp() {
     let bundlePath = Bundle.main.bundlePath
     let currentPID = ProcessInfo.processInfo.processIdentifier
     log(.debug, "Attempting to restart app at: \(bundlePath), current PID: \(currentPID)")
-    
-    // Create a shell script that waits for this process to terminate, then launches the app
+
+    // Keep the script constant and pass all runtime values as arguments. This avoids
+    // interpolating a bundle path into shell source and avoids a predictable temp file.
     let script = """
-    #!/bin/bash
-    # Wait for the current process to terminate
-    while kill -0 \(currentPID) 2>/dev/null; do
+    while kill -0 "$1" 2>/dev/null; do
         sleep 0.1
     done
-    # Launch the app
-    open "\(bundlePath)"
+    exec /usr/bin/open "$2"
     """
-    
+
     do {
-        // Write the script to a temporary file
-        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("appresize_restart.sh")
-        try script.write(to: tempURL, atomically: true, encoding: .utf8)
-        
-        // Make it executable
-        let chmodTask = Process()
-        chmodTask.executableURL = URL(fileURLWithPath: "/bin/chmod")
-        chmodTask.arguments = ["+x", tempURL.path]
-        try chmodTask.run()
-        chmodTask.waitUntilExit()
-        
-        // Execute the script in the background
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/bash")
-        task.arguments = [tempURL.path]
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", script, "Appresize restart", String(currentPID), bundlePath]
         try task.run()
-        
-        log(.debug, "Restart script launched successfully")
-        
+
+        log(.debug, "Restart helper launched successfully")
+
         // Terminate this instance
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             log(.debug, "Terminating current instance")
@@ -106,30 +91,6 @@ func restartApp() {
         }
     } catch {
         log(.error, "Failed to restart app: \(error)")
-        
-        // Fallback: try with direct executable path
-        attemptDirectExecutableRestart(bundlePath: bundlePath)
-    }
-}
-
-private func attemptDirectExecutableRestart(bundlePath: String) {
-    let executablePath = bundlePath + "/Contents/MacOS/Appresize"
-    log(.debug, "Fallback: trying direct executable at \(executablePath)")
-    
-    let fallbackTask = Process()
-    fallbackTask.executableURL = URL(fileURLWithPath: executablePath)
-    
-    do {
-        try fallbackTask.run()
-        log(.debug, "Fallback restart successful")
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            NSApp.terminate(nil)
-        }
-    } catch {
-        log(.error, "Fallback restart also failed: \(error)")
-        
-        // Final fallback: show instructions to user
         showManualRestartInstructions()
     }
 }
@@ -148,10 +109,14 @@ private func showManualRestartInstructions() {
 }
 
 
+func accessibilityTrustOptions(prompt: Bool) -> CFDictionary {
+    let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
+    let value: CFBoolean = prompt ? kCFBooleanTrue : kCFBooleanFalse
+    return [key: value] as CFDictionary
+}
+
 func isTrusted(prompt: Bool) -> Bool {
-    let prompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
-    let options = [prompt: prompt] as CFDictionary
-    return AXIsProcessTrustedWithOptions(options)
+    AXIsProcessTrustedWithOptions(accessibilityTrustOptions(prompt: prompt))
 }
 
 
@@ -168,48 +133,68 @@ func appVersion(short: Bool = false) -> String {
 
 // MARK: - Login Item Management
 
-func setLaunchAtLogin(_ enabled: Bool) {
-    if #available(macOS 13.0, *) {
-        // Use modern ServiceManagement API for macOS 13+
-        if enabled {
-            try? SMAppService.mainApp.register()
-        } else {
-            try? SMAppService.mainApp.unregister()
+enum LaunchAtLoginUpdateResult {
+    case enabled
+    case disabled
+    case requiresApproval
+    case failed
+}
+
+func setLaunchAtLogin(_ enabled: Bool) -> LaunchAtLoginUpdateResult {
+    let service = SMAppService.mainApp
+
+    if enabled {
+        switch service.status {
+        case .enabled:
+            return .enabled
+        case .requiresApproval:
+            return .requiresApproval
+        default:
+            break
         }
-    } else {
-        // Fallback for older macOS versions
-        setLaunchAtLoginLegacy(enabled)
+    } else if service.status == .notRegistered {
+        return .disabled
+    }
+
+    do {
+        if enabled {
+            try service.register()
+        } else {
+            try service.unregister()
+        }
+    } catch {
+        if enabled && service.status == .requiresApproval {
+            return .requiresApproval
+        }
+        if !enabled && service.status == .notRegistered {
+            return .disabled
+        }
+        log(.error, "Failed to \(enabled ? "enable" : "disable") login item: \(error.localizedDescription)")
+        return .failed
+    }
+
+    switch service.status {
+    case .enabled:
+        if enabled {
+            return .enabled
+        }
+        log(.error, "Login item remained enabled after unregistering")
+        return .failed
+    case .requiresApproval:
+        if enabled {
+            return .requiresApproval
+        }
+        log(.error, "Login item still requires approval after unregistering")
+        return .failed
+    default:
+        if !enabled {
+            return .disabled
+        }
+        log(.error, "Login item status did not become enabled after registration: \(service.status.rawValue)")
+        return .failed
     }
 }
 
 func isLaunchAtLoginEnabled() -> Bool {
-    if #available(macOS 13.0, *) {
-        // Use modern ServiceManagement API for macOS 13+
-        return SMAppService.mainApp.status == .enabled
-    } else {
-        // Fallback for older macOS versions
-        return isLaunchAtLoginEnabledLegacy()
-    }
-}
-
-@available(macOS, deprecated: 13.0)
-private func setLaunchAtLoginLegacy(_ enabled: Bool) {
-    let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.finestructure.Appresize"
-    
-    if enabled {
-        if !SMLoginItemSetEnabled(bundleIdentifier as CFString, true) {
-            log(.error, "Failed to enable login item")
-        }
-    } else {
-        if !SMLoginItemSetEnabled(bundleIdentifier as CFString, false) {
-            log(.error, "Failed to disable login item")
-        }
-    }
-}
-
-@available(macOS, deprecated: 13.0)
-private func isLaunchAtLoginEnabledLegacy() -> Bool {
-    // For legacy versions, we'll check the UserDefaults since SMLoginItemSetEnabled
-    // doesn't provide a way to query current state reliably
-    return Current.defaults().bool(forKey: DefaultsKeys.launchAtLogin.rawValue)
+    SMAppService.mainApp.status == .enabled
 }

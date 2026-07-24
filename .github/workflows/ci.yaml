@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: macos-15
@@ -13,42 +16,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: List available Xcode versions
-        run: ls -la /Applications/ | grep Xcode
-
-      - name: Select Xcode version
-        run: |
-          # Try to use the newest available Xcode version
-          if [ -d "/Applications/Xcode_16.1.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_16.0.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_15.4.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-          else
-            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          fi
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Show Xcode version
         run: xcodebuild -version
-
-      - name: Cache derived data
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Developer/Xcode/DerivedData
-          key: ${{ runner.os }}-derived-data-${{ hashFiles('**/*.xcodeproj') }}
-          restore-keys: |
-            ${{ runner.os }}-derived-data-
-
-      - name: Build app (Debug)
-        run: |
-          xcodebuild -project Appresize.xcodeproj \
-                     -scheme Appresize \
-                     -configuration Debug \
-                     -derivedDataPath build \
-                     build
 
       - name: Build tests
         run: |
@@ -68,7 +41,7 @@ jobs:
                      -configuration Debug \
                      -derivedDataPath build \
                      -destination 'platform=macOS' \
-                     -only-testing:AppresizeTests/ModifierTests
+                     -only-testing:AppresizeTests
 
       - name: Build app (Release)
         run: |
@@ -76,27 +49,26 @@ jobs:
                      -scheme Appresize \
                      -configuration Release \
                      -derivedDataPath build \
+                     -destination 'generic/platform=macOS' \
                      build
 
       - name: Verify app bundle
         run: |
-          echo "Checking app bundle structure:"
-          ls -la build/Build/Products/Release/
-          if [ -d "build/Build/Products/Release/Appresize.app" ]; then
-            echo "✅ App bundle created successfully"
-            echo "App bundle contents:"
-            ls -la "build/Build/Products/Release/Appresize.app/Contents/"
-            echo "Binary info:"
-            file "build/Build/Products/Release/Appresize.app/Contents/MacOS/Appresize"
-          else
-            echo "❌ App bundle not found"
+          APP_PATH="build/Build/Products/Release/Appresize.app"
+          BINARY_PATH="$APP_PATH/Contents/MacOS/Appresize"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "App bundle not found"
             exit 1
           fi
+          ARCHS="$(lipo -archs "$BINARY_PATH")"
+          [[ "$ARCHS" == *arm64* && "$ARCHS" == *x86_64* ]]
+          codesign --verify --deep --strict "$APP_PATH"
+          codesign -d --verbose=4 "$APP_PATH" 2>&1 | grep 'flags=.*runtime'
 
       - name: Upload build artifacts
         if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: appresize-debug-build
+          name: appresize-release-build
           path: build/Build/Products/Release/Appresize.app
           retention-days: 7

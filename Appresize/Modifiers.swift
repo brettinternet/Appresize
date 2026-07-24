@@ -32,10 +32,21 @@ struct Modifiers<K: Kind>: OptionSet, Hashable {
 
     private static var allArray: [Modifiers] { return [.shift, .fn, .control, .alt, .command] }
     private static var all: Modifiers { return Modifiers(allArray) }
+    var recognizedRawValue: UInt64 { intersection(.all).rawValue }
 
     func exclusivelySet(in eventFlags: CGEventFlags) -> Bool {
-        return self.intersection(.all) == Modifiers(rawValue: eventFlags.rawValue).intersection(.all)
+        let configured = Modifiers(rawValue: recognizedRawValue)
+        // Empty or invalid stored settings cannot activate on an event with no
+        // modifiers.
+        guard !configured.isEmpty else { return false }
+        return configured == Modifiers(rawValue: eventFlags.rawValue).intersection(.all)
     }
+}
+
+
+func modifierBindingsConflict(move: Modifiers<Move>, resize: Modifiers<Resize>) -> Bool {
+    let moveValue = move.recognizedRawValue
+    return moveValue != 0 && moveValue == resize.recognizedRawValue
 }
 
 

@@ -26,6 +26,34 @@ class ModifierTests: XCTestCase {
         }
     }
 
+    func test_emptyModifiersNeverMatch() {
+        let modifiers: Modifiers<Move> = []
+        let invalidStoredModifiers = Modifiers<Move>(rawValue: 0x1)
+
+        XCTAssertFalse(modifiers.exclusivelySet(in: []))
+        XCTAssertFalse(modifiers.exclusivelySet(in: [.maskSecondaryFn]))
+        XCTAssertFalse(invalidStoredModifiers.exclusivelySet(in: []))
+    }
+
+    func test_nonemptyModifiersMatchOnlyTheirSet() {
+        let modifiers: Modifiers<Move> = [.fn]
+
+        XCTAssertTrue(modifiers.exclusivelySet(in: [.maskSecondaryFn]))
+        XCTAssertFalse(modifiers.exclusivelySet(in: []))
+        XCTAssertFalse(modifiers.exclusivelySet(in: [.maskSecondaryFn, .maskControl]))
+    }
+
+    func test_modifierBindingsConflict() {
+        XCTAssertTrue(modifierBindingsConflict(move: [.fn], resize: [.fn]))
+        XCTAssertTrue(modifierBindingsConflict(
+            move: Modifiers(rawValue: Modifiers<Move>.fn.rawValue | 0x1),
+            resize: [.fn]
+        ))
+        XCTAssertFalse(modifierBindingsConflict(move: [.fn], resize: [.fn, .alt]))
+        XCTAssertFalse(modifierBindingsConflict(move: [], resize: []))
+        XCTAssertFalse(modifierBindingsConflict(move: [], resize: [.fn]))
+    }
+
     func test_Defaultable() throws {
         let prefs = testUserDefaults()
         let orig: Modifiers<Move> = [.fn, .control]
