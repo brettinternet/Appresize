@@ -31,7 +31,7 @@ task build:release # build only
 task copy:release # build and copy the app to /Applications
 ```
 
-Open the app `build/Build/Products/Release/Appresize.app`. 
+Open the app `build/Build/Products/Release/Appresize.app`.
 
 > [!IMPORTANT]  
 > With a new build, you'll have to quit the previously built app, remove and re-add the app entry in MacOS settings Privacy & Security > Accessibility.
@@ -50,4 +50,4 @@ This app uses the macOS Accessibility APIs in order to discover windows and upda
 
 ## Contributions
 
-Contributions are welcome. Credit to Easy Move+Resize by Daniel Marcotte and Hummingbird by Sven A. Schmidt for their original work. App icon by [IconKitchen](https://icon.kitchen/).
+Contributions are welcome. Credit to Easy Move+Resize by Daniel Marcotte and Hummingbird by Sven A. Schmidt for their original work. App icon by IconKitchen.
