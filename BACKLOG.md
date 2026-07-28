@@ -32,11 +32,11 @@ The event tap should never interrupt a valid operation or consume input for a wi
 - [x] DOD1 — Focused regression tests cover timeout, non-settable attributes, failed writes, and clamped geometry.
 - [x] DOD2 — Debug and Release builds succeed.
 
-Evidence: 42 focused unit tests pass; Debug test build and universal Release build succeed.
+Evidence: 45 focused unit tests pass; Debug test build and universal Release build succeed.
 
 ### AR-002 — Make local release installation replacement-safe
 
-- Status: In progress — exact `/Applications` repeat-install still needs runtime verification
+- Status: Done
 - Priority: P0
 - Dependencies: None
 
@@ -49,15 +49,15 @@ The documented `copy:release` task can currently nest `Appresize.app` inside an 
 
 #### Acceptance criteria
 
-- [ ] AC1 — Running `task copy:release` twice leaves exactly one `/Applications/Appresize.app`.
-- [ ] AC2 — The installed app reports the version from the second build.
+- [x] AC1 — Running `task copy:release` twice leaves exactly one `/Applications/Appresize.app`.
+- [x] AC2 — The installed app reports the version from the second build.
 
 #### Definition of Done
 
-- [ ] DOD1 — The repeat-install behavior is verified locally.
+- [x] DOD1 — The repeat-install behavior is verified locally.
 - [x] DOD2 — README build instructions remain accurate.
 
-Evidence: `/usr/bin/ditto` replacement behavior passed an installation-shaped temporary-directory check; the exact `/Applications` path remains unchecked.
+Evidence: the native installer stages a fresh bundle, moves the previous installation to Trash, and rolls back on replacement failure. Two exact `/Applications` installs left one unnested, signature-valid Appresize 0.0.3 whose binary matches the second build.
 
 ### AR-003 — Add a native Enabled control to the status menu
 
@@ -84,7 +84,7 @@ Evidence: state transitions and presentation policy are unit-tested; live menu p
 
 #### Definition of Done
 
-- [ ] DOD1 — State transitions and menu presentation have focused tests.
+- [x] DOD1 — State transitions and menu presentation have focused tests.
 - [ ] DOD2 — VoiceOver announces the status button and Enabled state clearly.
 
 ### AR-004 — Improve first-launch and login-item permission behavior
@@ -137,11 +137,11 @@ The existing AppKit interface should follow current macOS naming, keyboard, and 
 
 #### Acceptance criteria
 
-- [ ] AC1 — Command-Comma opens Settings from an active Appresize process.
+- [x] AC1 — Command-Comma opens Settings from an active Appresize process.
 - [ ] AC2 — Every Settings control and link is reachable and understandable with keyboard navigation and VoiceOver.
 - [x] AC3 — Invalid modifier combinations explain how to recover.
 
-Evidence: both XIBs compile and Debug/Release builds pass; live keyboard, VoiceOver, Accessibility Inspector, and screenshot checks remain.
+Evidence: a hosted-app test invokes the Command-Comma menu item and verifies the Settings window opens; both XIBs compile and Debug/Release builds pass. Live keyboard traversal, VoiceOver, Accessibility Inspector, and screenshot checks remain.
 
 #### Definition of Done
 
@@ -150,7 +150,7 @@ Evidence: both XIBs compile and Debug/Release builds pass; live keyboard, VoiceO
 
 ### AR-006 — Reduce Accessibility polling and hot-path work
 
-- Status: In progress — end-to-end permission transition coverage remains
+- Status: Done
 - Priority: P1
 - Dependencies: AR-001
 
@@ -171,10 +171,10 @@ Permission checks should remain safe without running a TCC query for every inter
 
 #### Definition of Done
 
-- [ ] DOD1 — Permission transition tests cover grant, revoke, and event-tap disable paths.
+- [x] DOD1 — Permission transition tests cover grant, revoke, and event-tap disable paths.
 - [x] DOD2 — Instruments or lightweight counters confirm the idle hot path no longer polls TCC.
 
-Evidence: one common-run-loop monitor owns permission changes; injected counters prove idle events do not query trust.
+Evidence: one common-run-loop monitor owns permission changes; pure transition tests cover grant, revoke, and unchanged state, Tracker tests cover event-tap disable, and injected counters prove idle events do not query trust.
 
 ### AR-007 — Add focused core behavior tests
 
@@ -203,13 +203,13 @@ The Tracker state machine and launch behavior need deterministic coverage withou
 - [ ] DOD1 — `task test:unit` passes locally with Appresize stopped and in CI.
 - [x] DOD2 — The test seam remains internal and introduces no production abstraction beyond what tests exercise.
 
-Evidence: `task test:unit` passes 42 tests; the XCTest host skips production services and Tracker tests use the no-tap seam. Preflight reports a running Appresize process explicitly.
+Evidence: `task test:unit` passes 45 tests; the XCTest host skips production services and Tracker tests use the no-tap seam. Preflight reports a running Appresize process explicitly.
 
 ## Later
 
 ### AR-008 — Strengthen release metadata and compatibility
 
-- Status: In progress — Ventura runtime evidence is required before lowering the target
+- Status: In progress — implementation complete; current-revision CI execution remains
 - Priority: P2
 - Dependencies: None
 
@@ -232,7 +232,7 @@ Release artifacts should identify their contents correctly and support the wides
 - [ ] DOD1 — Tag, manual-release, and compatibility checks run in CI.
 - [ ] DOD2 — Ventura runtime evidence is recorded before lowering the deployment target.
 
-Evidence: tag/manual versions are gated before release; the current macOS 15.2 artifact builds for arm64 and x86_64. A macOS 13 build was evaluated, but the published target remains unchanged pending Ventura runtime evidence.
+Evidence: tag/manual versions are gated before release; the current macOS 15.2 artifact builds for arm64 and x86_64. A macOS 14 target override fails because `NSCursor.frameResize` requires macOS 15+, so Ventura cannot run the current implementation. README and generated release notes consistently state macOS 15.2 or newer. Workflow YAML and version-gate behavior pass local validation; current-revision remote execution remains pending.
 
 ### AR-009 — Add restrained operation feedback and reachability guards
 

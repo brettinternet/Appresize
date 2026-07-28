@@ -74,7 +74,7 @@ tasks:
     desc: Copy the built app release to the Applications folder
     deps: ["build:release"]
     cmds:
-      - /usr/bin/ditto "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app" /Applications/Appresize.app
+      - /usr/bin/xcrun swift ./scripts/install-release.swift "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app" /Applications/Appresize.app
 
   open:
     desc: Run the built app (Debug)

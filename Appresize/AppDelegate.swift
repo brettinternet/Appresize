@@ -14,6 +14,19 @@ func isLoginItemLaunch(_ event: NSAppleEventDescriptor?) -> Bool {
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
 
+    enum PermissionTransition: Equatable {
+        case granted
+        case revoked
+        case unchanged
+    }
+
+    struct StatusPresentation: Equatable {
+        let isActive: Bool
+        let menuChecked: Bool
+        let iconAlpha: CGFloat
+        let accessibilityValue: String
+    }
+
     static func shouldPresentFirstLaunchSettings(isFirstLaunch: Bool, launchedAsLoginItem: Bool) -> Bool {
         isFirstLaunch && !launchedAsLoginItem
     }
@@ -24,6 +37,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     static func statusIsActive(state: AppStateMachine.State, trackerIsActive: Bool, isTrusted: Bool) -> Bool {
         state == .activated && trackerIsActive && isTrusted
+    }
+
+    static func permissionTransition(from previous: Bool, to current: Bool) -> PermissionTransition {
+        switch (previous, current) {
+        case (false, true):
+            return .granted
+        case (true, false):
+            return .revoked
+        default:
+            return .unchanged
+        }
+    }
+
+    static func statusPresentation(
+        state: AppStateMachine.State,
+        trackerIsActive: Bool,
+        isTrusted: Bool
+    ) -> StatusPresentation {
+        let active = statusIsActive(state: state, trackerIsActive: trackerIsActive, isTrusted: isTrusted)
+        return StatusPresentation(
+            isActive: active,
+            menuChecked: active,
+            iconAlpha: active ? 1.0 : 0.45,
+            accessibilityValue: isTrusted
+                ? (active ? "Enabled" : "Paused")
+                : "Accessibility permission required"
+        )
+    }
+
+    static func shouldHidePermissionStatusMenuItem(isTrusted: Bool) -> Bool {
+        isTrusted
     }
 
     static func isUnitTestHost(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
@@ -116,7 +160,7 @@ extension AppDelegate: NSMenuDelegate {
             let hidden = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask) == .option
             versionMenuItem?.isHidden = !hidden
         }
-        accessibilityStatusMenuItem?.isHidden = lastPermissionState
+        accessibilityStatusMenuItem?.isHidden = Self.shouldHidePermissionStatusMenuItem(isTrusted: lastPermissionState)
         accessibilityStatusMenuItem?.title = "⚠️ Accessibility permission required"
         updateStatusPresentation(trusted: lastPermissionState)
     }
@@ -149,14 +193,16 @@ extension AppDelegate {
     }
 
     private func updateStatusPresentation(trusted: Bool) {
-        let active = Self.statusIsActive(state: stateMachine.state, trackerIsActive: Tracker.isActive, isTrusted: trusted)
-        enabledMenuItem?.state = active ? .on : .off
-        enabledMenuItem?.title = "Enabled"
-        enabledMenuItem?.setAccessibilityValue(active ? "On" : "Off")
-        statusItem?.button?.alphaValue = active ? 1.0 : 0.45
-        statusItem?.button?.setAccessibilityValue(
-            trusted ? (active ? "Enabled" : "Paused") : "Accessibility permission required"
+        let presentation = Self.statusPresentation(
+            state: stateMachine.state,
+            trackerIsActive: Tracker.isActive,
+            isTrusted: trusted
         )
+        enabledMenuItem?.state = presentation.menuChecked ? .on : .off
+        enabledMenuItem?.title = "Enabled"
+        enabledMenuItem?.setAccessibilityValue(presentation.isActive ? "On" : "Off")
+        statusItem?.button?.alphaValue = presentation.iconAlpha
+        statusItem?.button?.setAccessibilityValue(presentation.accessibilityValue)
     }
 
 }
@@ -180,8 +226,8 @@ extension AppDelegate {
     private func checkPermissionChange() {
         let currentPermissionState = isTrusted(prompt: false)
         
-        // Check if permissions were just granted (changed from false to true)
-        if !lastPermissionState && currentPermissionState {
+        switch Self.permissionTransition(from: lastPermissionState, to: currentPermissionState) {
+        case .granted:
             if stateMachine.state == .deactivated {
                 stateMachine.checkState()
             } else if stateMachine.state == .activated && !Tracker.isActive {
@@ -191,14 +237,14 @@ extension AppDelegate {
             if stateMachine.state != .activated && Self.shouldPresentPermissionAlert(launchedAsLoginItem: launchedAsLoginItem) {
                 showRestartPrompt()
             }
-        }
-        // Check if permissions were just revoked (changed from true to false)
-        else if lastPermissionState && !currentPermissionState {
+        case .revoked:
             log(.error, "Accessibility permissions revoked - immediately deactivating to prevent system crashes")
             stateMachine.deactivate()
             if Self.shouldPresentPermissionAlert(launchedAsLoginItem: launchedAsLoginItem) {
                 showPermissionRevokedAlert()
             }
+        case .unchanged:
+            break
         }
         
         lastPermissionState = currentPermissionState
