@@ -3,11 +3,12 @@ import Cocoa
 
 extension AXUIElement {
 
+    private func canSet(_ attribute: NSAccessibility.Attribute) -> Bool {
+        var settable = DarwinBoolean(false)
+        return AXUIElementIsAttributeSettable(self, attribute as CFString, &settable) == .success && settable.boolValue
+    }
+
     class func window(at position: CGPoint) -> AXUIElement? {
-        guard isTrusted(prompt: false) else {
-            return nil
-        }
-        
         var element: AXUIElement?
         var selected: AXUIElement?
         let systemwideElement = AXUIElementCreateSystemWide()
@@ -54,8 +55,6 @@ extension AXUIElement {
 
     var origin: CGPoint? {
         get {
-            guard isTrusted(prompt: false) else { return nil }
-            
             var pos = CGPoint.zero
 
             var ref: CFTypeRef?
@@ -83,8 +82,14 @@ extension AXUIElement {
             return success ? pos : nil
         }
         set {
-            guard isTrusted(prompt: false), var newValue = newValue else { return }
-            let success = withUnsafePointer(to: &newValue) { ptr -> Bool in
+            guard let newValue else { return }
+            _ = setOrigin(newValue)
+        }
+    }
+
+    @discardableResult
+    func setOrigin(_ newValue: CGPoint) -> Bool {
+        let success = withUnsafePointer(to: newValue) { ptr -> Bool in
                 if let position = AXValueCreate(.cgPoint, ptr) {
                     switch AXUIElementSetAttributeValue(self, NSAccessibility.Attribute.position as CFString, position) {
                     case .success:
@@ -98,14 +103,14 @@ extension AXUIElement {
             if !success {
                 log(.debug, "ERROR: failed to set window origin")
             }
-        }
+        return success
     }
+
+    var isOriginSettable: Bool { canSet(.position) }
 
 
     var size: CGSize? {
         get {
-            guard isTrusted(prompt: false) else { return nil }
-            
             var size: CGSize = CGSize.zero
 
             var ref: CFTypeRef?
@@ -133,8 +138,14 @@ extension AXUIElement {
             return success ? size : nil
         }
         set {
-            guard isTrusted(prompt: false), var newValue = newValue else { return }
-            let success = withUnsafePointer(to: &newValue) { ptr -> Bool in
+            guard let newValue else { return }
+            _ = setSize(newValue)
+        }
+    }
+
+    @discardableResult
+    func setSize(_ newValue: CGSize) -> Bool {
+        let success = withUnsafePointer(to: newValue) { ptr -> Bool in
                 if let size = AXValueCreate(.cgSize, ptr) {
                     switch AXUIElementSetAttributeValue(self, NSAccessibility.Attribute.size as CFString, size) {
                     case .success:
@@ -148,7 +159,20 @@ extension AXUIElement {
             if !success {
                 log(.debug, "ERROR: failed to set window size")
             }
-        }
+        return success
+    }
+
+    var isSizeSettable: Bool { canSet(.size) }
+
+    var trackingWindow: TrackingWindow {
+        TrackingWindow(
+            origin: { [self] in origin },
+            size: { [self] in size },
+            canSetOrigin: { [self] in isOriginSettable },
+            canSetSize: { [self] in isSizeSettable },
+            setOrigin: { [self] value in setOrigin(value) },
+            setSize: { [self] value in setSize(value) }
+        )
     }
 
 }

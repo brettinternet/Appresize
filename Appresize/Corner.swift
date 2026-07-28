@@ -1,7 +1,7 @@
 import Foundation
 
 
-enum Corner: CustomStringConvertible {
+enum Corner: CustomStringConvertible, Equatable {
     case topLeft
     case topRight
     case bottomRight

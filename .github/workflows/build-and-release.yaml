@@ -25,6 +25,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate release version
+        env:
+          RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          MARKETING_VERSION="$(xcodebuild -project Appresize.xcodeproj \
+            -scheme Appresize \
+            -configuration Release \
+            -showBuildSettings | \
+            awk -F ' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ { print $2; exit }')"
+          ./scripts/validate-release-version.sh "$RELEASE_VERSION" "$MARKETING_VERSION"
+
       - name: Show Xcode version
         run: xcodebuild -version
 
@@ -58,13 +70,23 @@ jobs:
                      build
 
       - name: Verify release
+        env:
+          RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
         run: |
+          set -euo pipefail
           APP_PATH="build/Build/Products/Release/Appresize.app"
           BINARY_PATH="$APP_PATH/Contents/MacOS/Appresize"
           ARCHS="$(lipo -archs "$BINARY_PATH")"
           [[ "$ARCHS" == *arm64* && "$ARCHS" == *x86_64* ]]
           codesign --verify --deep --strict "$APP_PATH"
           codesign -d --verbose=4 "$APP_PATH" 2>&1 | grep 'flags=.*runtime'
+          MARKETING_VERSION="$(xcodebuild -project Appresize.xcodeproj \
+            -scheme Appresize \
+            -configuration Release \
+            -showBuildSettings | \
+            awk -F ' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ { print $2; exit }')"
+          ./scripts/validate-release-version.sh \
+            "$RELEASE_VERSION" "$MARKETING_VERSION" "$APP_PATH/Contents/Info.plist"
 
       - name: Create DMG
         env:

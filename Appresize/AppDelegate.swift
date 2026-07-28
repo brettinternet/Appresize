@@ -14,13 +14,32 @@ func isLoginItemLaunch(_ event: NSAppleEventDescriptor?) -> Bool {
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
 
+    static func shouldPresentFirstLaunchSettings(isFirstLaunch: Bool, launchedAsLoginItem: Bool) -> Bool {
+        isFirstLaunch && !launchedAsLoginItem
+    }
+
+    static func shouldPresentPermissionAlert(launchedAsLoginItem: Bool) -> Bool {
+        !launchedAsLoginItem
+    }
+
+    static func statusIsActive(state: AppStateMachine.State, trackerIsActive: Bool, isTrusted: Bool) -> Bool {
+        state == .activated && trackerIsActive && isTrusted
+    }
+
+    static func isUnitTestHost(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        environment["XCTestConfigurationFilePath"] != nil
+    }
+
     @IBOutlet weak var statusMenu: NSMenu!
     var statusItem: NSStatusItem!
+    @IBOutlet weak var enabledMenuItem: NSMenuItem!
     @IBOutlet weak var accessibilityStatusMenuItem: NSMenuItem!
     @IBOutlet weak var versionMenuItem: NSMenuItem!
 
+    private var loadedPreferencesController: PreferencesController?
     lazy var preferencesController: PreferencesController = {
         let c = PreferencesController(windowNibName: "PreferencesController")
+        loadedPreferencesController = c
         return c
     }()
 
@@ -39,7 +58,10 @@ extension AppDelegate {
 
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        if Date(forKey: .firstLaunched, defaults: Current.defaults()) == nil {
+        guard !Self.isUnitTestHost() else { return }
+
+        let isFirstLaunch = Date(forKey: .firstLaunched, defaults: Current.defaults()) == nil
+        if isFirstLaunch {
             try? Current.date().save(forKey: .firstLaunched, defaults: Current.defaults())
         }
 
@@ -51,12 +73,18 @@ extension AppDelegate {
         }
 
         statusMenu?.delegate = self
+        stateMachine.delegate = self
+        // The first manual launch opens Settings as onboarding; keep that
+        // presentation non-modal while preserving alerts for later activation.
+        stateMachine.suppressActivationAlerts = launchedAsLoginItem || isFirstLaunch
         lastPermissionState = isTrusted(prompt: false)
         startPermissionMonitoring()
         stateMachine.state = .validatingState
+        if isFirstLaunch {
+            stateMachine.suppressActivationAlerts = launchedAsLoginItem
+        }
 
-        if !Current.defaults().bool(forKey: DefaultsKeys.showMenuIcon.rawValue),
-           !launchedAsLoginItem {
+        if Self.shouldPresentFirstLaunchSettings(isFirstLaunch: isFirstLaunch, launchedAsLoginItem: launchedAsLoginItem) {
             NSApp.activate(ignoringOtherApps: true)
             preferencesController.showWindow(nil)
         }
@@ -88,9 +116,9 @@ extension AppDelegate: NSMenuDelegate {
             let hidden = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask) == .option
             versionMenuItem?.isHidden = !hidden
         }
-        do {
-            accessibilityStatusMenuItem?.isHidden = isTrusted(prompt: false)
-        }
+        accessibilityStatusMenuItem?.isHidden = lastPermissionState
+        accessibilityStatusMenuItem?.title = "⚠️ Accessibility permission required"
+        updateStatusPresentation(trusted: lastPermissionState)
     }
 }
 
@@ -102,6 +130,7 @@ extension AppDelegate {
             let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
             statusItem.menu = statusMenu
             statusItem.button?.image = NSImage(named: "MenuIcon")
+            statusItem.button?.setAccessibilityLabel("Appresize status")
             return statusItem
         }()
         statusMenu?.autoenablesItems = false
@@ -119,15 +148,28 @@ extension AppDelegate {
             : removeStatusItemFromMenubar()
     }
 
+    private func updateStatusPresentation(trusted: Bool) {
+        let active = Self.statusIsActive(state: stateMachine.state, trackerIsActive: Tracker.isActive, isTrusted: trusted)
+        enabledMenuItem?.state = active ? .on : .off
+        enabledMenuItem?.title = "Enabled"
+        enabledMenuItem?.setAccessibilityValue(active ? "On" : "Off")
+        statusItem?.button?.alphaValue = active ? 1.0 : 0.45
+        statusItem?.button?.setAccessibilityValue(
+            trusted ? (active ? "Enabled" : "Paused") : "Accessibility permission required"
+        )
+    }
+
 }
 
 
 // MARK:- Permission Monitoring
 extension AppDelegate {
     private func startPermissionMonitoring() {
-        permissionMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.checkPermissionChange()
         }
+        permissionMonitorTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
     
     private func stopPermissionMonitoring() {
@@ -140,8 +182,13 @@ extension AppDelegate {
         
         // Check if permissions were just granted (changed from false to true)
         if !lastPermissionState && currentPermissionState {
-            stateMachine.checkState()
-            if stateMachine.state != .activated {
+            if stateMachine.state == .deactivated {
+                stateMachine.checkState()
+            } else if stateMachine.state == .activated && !Tracker.isActive {
+                stateMachine.state = .deactivated
+                stateMachine.checkState()
+            }
+            if stateMachine.state != .activated && Self.shouldPresentPermissionAlert(launchedAsLoginItem: launchedAsLoginItem) {
                 showRestartPrompt()
             }
         }
@@ -149,16 +196,34 @@ extension AppDelegate {
         else if lastPermissionState && !currentPermissionState {
             log(.error, "Accessibility permissions revoked - immediately deactivating to prevent system crashes")
             stateMachine.deactivate()
-            showPermissionRevokedAlert()
+            if Self.shouldPresentPermissionAlert(launchedAsLoginItem: launchedAsLoginItem) {
+                showPermissionRevokedAlert()
+            }
         }
         
         lastPermissionState = currentPermissionState
+        updateStatusPresentation(trusted: currentPermissionState)
+        loadedPreferencesController?.updateAccessibilityStatus(trusted: currentPermissionState)
     }
 }
 
 
 // MARK:- IBActions
 extension AppDelegate {
+    @IBAction func enabledClicked(_ sender: NSMenuItem) {
+        let previousAlertPolicy = stateMachine.suppressActivationAlerts
+        let trusted = isTrusted(prompt: false)
+        if !trusted {
+            // This is an explicit user action, so it may use the normal
+            // Accessibility permission flow even for a silent login launch.
+            stateMachine.suppressActivationAlerts = false
+        }
+        stateMachine.toggleEnabled()
+        stateMachine.suppressActivationAlerts = previousAlertPolicy
+        lastPermissionState = trusted
+        updateStatusPresentation(trusted: trusted)
+    }
+
     @IBAction func accessibilityStatusClicked(_ sender: Any) {
         showAccessibilityAlert()
     }
@@ -172,4 +237,15 @@ extension AppDelegate {
         NSWorkspace.shared.open(Links.appHelp)
     }
 
+    @IBAction func reportIssueClicked(_ sender: Any) {
+        NSWorkspace.shared.open(Links.appIssues)
+    }
+
+}
+
+
+extension AppDelegate: DidTransitionDelegate {
+    func didTransition(from: AppStateMachine.State, to: AppStateMachine.State) {
+        updateStatusPresentation(trusted: lastPermissionState)
+    }
 }

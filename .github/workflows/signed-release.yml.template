@@ -29,7 +29,19 @@ jobs:
       uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         persist-credentials: false
-      
+
+    - name: Validate release version
+      env:
+        RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
+      run: |
+        set -euo pipefail
+        MARKETING_VERSION="$(xcodebuild -project Appresize.xcodeproj \
+          -scheme Appresize \
+          -configuration Release \
+          -showBuildSettings | \
+          awk -F ' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ { print $2; exit }')"
+        ./scripts/validate-release-version.sh "$RELEASE_VERSION" "$MARKETING_VERSION"
+
     - name: Select Xcode version
       run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
       

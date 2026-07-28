@@ -92,4 +92,9 @@ class ModifierTests: XCTestCase {
         XCTAssertEqual("\(Modifiers<Move>([.fn, .control]))", "fn control")
     }
 
+    func test_symbolDescriptionUsesReadableModifierGlyphs() {
+        XCTAssertEqual(Modifiers<Move>([.command, .alt, .control, .shift, .fn]).symbolDescription, "⌘ ⌥ ⌃ ⇧ fn")
+        XCTAssertEqual(Modifiers<Move>([.fn, .control]).symbolDescription, "⌃ fn")
+    }
+
 }

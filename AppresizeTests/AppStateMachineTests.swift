@@ -8,35 +8,40 @@ class AppStateMachineTests: XCTestCase {
         Tracker.disable()
     }
 
-    // DISABLED: This test triggers accessibility permission dialogs that hang CI
-    // TODO: Re-enable when we have a proper test environment setup
-    func DISABLED_test_app_launches_successfully() throws {
-        // setup
-        Current.date = { ReferenceDate }
-        let defaults = testUserDefaults()
-        let firstLaunched = day(offset: -60, from: ReferenceDate)
-        try firstLaunched.save(forKey: .firstLaunched, defaults: defaults)
-        Current.defaults = { defaults }
-
-        // MUT - Create app and state machine but don't trigger full activation
-        let app = TestAppDelegate()
-        
-        // Test initial state
-        XCTAssertEqual(app.stateMachine.state, .launching)
-        
-        // Test manual state transition (without full activation that triggers permissions)
-        app.stateMachine.state = .validatingState
-        XCTAssertEqual(app.stateMachine.state, .validatingState)
-        
-        // Verify that transitions were recorded
-        XCTAssertEqual(app.transitions.count, 1)
-        XCTAssertEqual(app.transitions[0].from, .launching)
-        XCTAssertEqual(app.transitions[0].to, .validatingState)
-    }
 }
 
 
 class AppDelegateLaunchTests: XCTestCase {
+
+    func test_manual_first_launch_presents_settings_but_login_launch_stays_silent() {
+        XCTAssertTrue(AppDelegate.shouldPresentFirstLaunchSettings(isFirstLaunch: true, launchedAsLoginItem: false))
+        XCTAssertFalse(AppDelegate.shouldPresentFirstLaunchSettings(isFirstLaunch: true, launchedAsLoginItem: true))
+        XCTAssertFalse(AppDelegate.shouldPresentFirstLaunchSettings(isFirstLaunch: false, launchedAsLoginItem: false))
+    }
+
+    func test_login_launch_suppresses_permission_alerts() {
+        XCTAssertTrue(AppDelegate.shouldPresentPermissionAlert(launchedAsLoginItem: false))
+        XCTAssertFalse(AppDelegate.shouldPresentPermissionAlert(launchedAsLoginItem: true))
+    }
+
+    func test_statusPresentationRequires_tracker_permission_and_activated_state() {
+        XCTAssertTrue(AppDelegate.statusIsActive(state: .activated, trackerIsActive: true, isTrusted: true))
+        XCTAssertFalse(AppDelegate.statusIsActive(state: .activated, trackerIsActive: false, isTrusted: true))
+        XCTAssertFalse(AppDelegate.statusIsActive(state: .activated, trackerIsActive: true, isTrusted: false))
+        XCTAssertFalse(AppDelegate.statusIsActive(state: .deactivated, trackerIsActive: true, isTrusted: true))
+    }
+
+    func test_xctest_host_does_not_start_runtime_services() {
+        XCTAssertTrue(AppDelegate.isUnitTestHost(environment: ["XCTestConfigurationFilePath": "/tmp/test.xctestconfiguration"]))
+        XCTAssertFalse(AppDelegate.isUnitTestHost(environment: [:]))
+    }
+
+    func test_enabled_toggle_deactivates_active_tracker() {
+        let app = AppStateMachine(initialState: .activated)
+        app.toggleEnabled()
+        XCTAssertEqual(app.state, .deactivated)
+        XCTAssertFalse(Tracker.isActive)
+    }
 
     func test_login_item_open_event_is_detected() {
         let event = openApplicationEvent()

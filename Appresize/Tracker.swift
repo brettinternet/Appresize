@@ -11,6 +11,51 @@ import Cocoa
 
 class Tracker {
 
+    enum CursorKind: Equatable {
+        case move
+        case resize(Corner)
+    }
+
+    struct Dependencies {
+        var trusted: () -> Bool
+        var windowAt: (CGPoint) -> TrackingWindow?
+        var now: () -> CFAbsoluteTime
+        var displays: () -> [DisplayFrame] = { [] }
+        var cursorCurrent: () -> NSCursor = { NSCursor.arrow }
+        var cursorSet: (NSCursor) -> Void = { $0.set() }
+        var cursorFor: (CursorKind) -> NSCursor = { _ in NSCursor.arrow }
+        var installEventTap: Bool
+
+        static var live: Self {
+            Self(
+                trusted: { isTrusted(prompt: false) },
+                windowAt: { AXUIElement.window(at: $0)?.trackingWindow },
+                now: { CFAbsoluteTimeGetCurrent() },
+                displays: {
+                    let screens = NSScreen.screens
+                    guard let primaryFrame = screens.first?.frame else { return [] }
+                    return accessibilityDisplayFrames(
+                        appKitVisibleFrames: screens.map(\.visibleFrame),
+                        primaryFrame: primaryFrame
+                    )
+                },
+                cursorCurrent: { NSCursor.currentSystem ?? NSCursor.arrow },
+                cursorSet: { $0.set() },
+                cursorFor: { kind in
+                    switch kind {
+                    case .move:
+                        return NSCursor.closedHand
+                    case .resize(.topLeft), .resize(.bottomRight):
+                        return NSCursor.frameResize(position: .topLeft, directions: .all)
+                    case .resize(.topRight), .resize(.bottomLeft):
+                        return NSCursor.frameResize(position: .topRight, directions: .all)
+                    }
+                },
+                installEventTap: true
+            )
+        }
+    }
+
     // constants to throttle moving and resizing
     static let moveFilterInterval = 0.01
     static let resizeFilterInterval = 0.02
@@ -31,6 +76,7 @@ class Tracker {
     }
 
     static func disable() {
+        shared?.resetTrackingState()
         shared = nil
     }
 
@@ -41,39 +87,43 @@ class Tracker {
 
     private let trackingInfo = TrackingInfo()
 
-    #if !TEST  // cannot populate these ivars when testing
-    private let eventTap: CFMachPort
+    private let dependencies: Dependencies
+    private let eventTap: CFMachPort?
     private let runLoopSource: CFRunLoopSource?
-    #endif
 
     private var currentState: State = .idle
     private var moveModifiers = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
     private var resizeModifiers = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
     private var requireDragToActivate: Bool = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
-    private var accessibilityMonitorTimer: Timer?
     private var lastEventTime: CFAbsoluteTime = 0
     private var activeDragButton: Int64?
+    private var priorCursor: NSCursor?
+    private var activeCursor: CursorKind?
     private static let maxEventAbsorptionTime: CFAbsoluteTime = 5.0  // Max 5 seconds of continuous absorption
 
 
-    private init() throws {
-        // don't enable tap for TEST or we'll trigger the permissions alert
-        #if !TEST
-        let res = try enableTap()
-        self.eventTap = res.eventTap
-        self.runLoopSource = res.runLoopSource
-        NotificationCenter.default.addObserver(self, selector: #selector(readModifiers), name: UserDefaults.didChangeNotification, object: Current.defaults())
-        startAccessibilityMonitoring()
-        #endif
+    init(dependencies: Dependencies = .live) throws {
+        self.dependencies = dependencies
+        if dependencies.installEventTap {
+            let res = try enableTap()
+            self.eventTap = res.eventTap
+            self.runLoopSource = res.runLoopSource
+        } else {
+            self.eventTap = nil
+            self.runLoopSource = nil
+        }
+        if dependencies.installEventTap {
+            NotificationCenter.default.addObserver(self, selector: #selector(readModifiers), name: UserDefaults.didChangeNotification, object: Current.defaults())
+        }
     }
 
 
     deinit {
-        #if !TEST
-        stopAccessibilityMonitoring()
-        disableTap(eventTap: eventTap, runLoopSource: runLoopSource)
+        resetTrackingState()
+        if let eventTap {
+            disableTap(eventTap: eventTap, runLoopSource: runLoopSource)
+        }
         NotificationCenter.default.removeObserver(self)
-        #endif
     }
 
 
@@ -82,59 +132,19 @@ class Tracker {
         resizeModifiers = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
         requireDragToActivate = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
     }
-    
-    
-    private func startAccessibilityMonitoring() {
-        // Check accessibility permissions every 2 seconds
-        accessibilityMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.checkAccessibilityPermissions()
-        }
-    }
-    
-    
-    private func stopAccessibilityMonitoring() {
-        accessibilityMonitorTimer?.invalidate()
-        accessibilityMonitorTimer = nil
-    }
-    
-    
-    @objc private func checkAccessibilityPermissions() {
-        guard !isTrusted(prompt: false) else { return }
-        
-        log(.error, "⚠️ Accessibility permissions revoked - safely disabling tracker to prevent system freeze")
-        
-        // Safely disable the tracker on the main thread
-        DispatchQueue.main.async {
-            Tracker.disable()
-        }
-    }
-
-
     public func handleEvent(_ event: CGEvent, type: CGEventType) -> Bool {
-        // Safety check: verify accessibility permissions are still granted
-        guard isTrusted(prompt: false) else {
-            log(.error, "⚠️ Accessibility permissions lost during event handling - aborting")
-            DispatchQueue.main.async {
-                Tracker.disable()
-            }
-            return false
-        }
-        
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            guard dependencies.trusted() else {
+                resetTrackingState()
+                DispatchQueue.main.async { Tracker.disable() }
+                return false
+            }
             // need to re-enable our eventTap (We got disabled. Usually happens on a slow resizing app)
             log(.debug, "Re-enabling")
             resetTrackingState()
-            #if !TEST
-            // Double-check permissions before re-enabling
-            guard isTrusted(prompt: false) else {
-                log(.error, "⚠️ Cannot re-enable tap: accessibility permissions lost")
-                DispatchQueue.main.async {
-                    Tracker.disable()
-                }
-                return false
+            if let eventTap {
+                CGEvent.tapEnable(tap: eventTap, enable: true)
             }
-            CGEvent.tapEnable(tap: eventTap, enable: true)
-            #endif
             return false
         }
 
@@ -160,11 +170,17 @@ class Tracker {
         }
 
         if moveModifiers.isEmpty && resizeModifiers.isEmpty { return false }
-        
+
         // If we're currently in an active state (moving or resizing), absorb all mouse events
         // to prevent default actions like text selection
         if currentState != .idle && (isDragEvent || isMoveEvent || isMouseButtonEvent) {
-            let currentTime = CFAbsoluteTimeGetCurrent()
+            guard dependencies.trusted() else {
+                log(.error, "⚠️ Accessibility permissions lost during event handling - aborting")
+                resetTrackingState()
+                DispatchQueue.main.async { Tracker.disable() }
+                return false
+            }
+            let currentTime = dependencies.now()
             
             // Safety timeout: if we've been absorbing events for too long, reset to idle
             if lastEventTime > 0 && (currentTime - lastEventTime) > Self.maxEventAbsorptionTime {
@@ -181,23 +197,25 @@ class Tracker {
             
             switch (currentState, nextState) {
                 case (.moving, .moving):
-                    move(delta: event.mouseDelta)
-                    return true  // Block all mouse events while moving
+                    let handled = move(delta: event.mouseDelta, pointerLocation: event.location)
+                    if handled { lastEventTime = currentTime }
+                    return handled  // Block all mouse events while moving
                 case (.resizing, .resizing):
-                    resize(delta: event.mouseDelta)
-                    return true  // Block all mouse events while resizing
+                    let handled = resize(delta: event.mouseDelta)
+                    if handled { lastEventTime = currentTime }
+                    return handled  // Block all mouse events while resizing
                 case (.moving, .idle), (.resizing, .idle):
                     resetTrackingState()
                     return isMouseButtonEvent ? false : true  // Pass button transitions through
                 case (.moving, .resizing):
-                    guard startTracking(at: event.location) else {
+                    guard startTracking(at: event.location, state: nextState) else {
                         resetTrackingState()
                         return false
                     }
                     currentState = nextState
                     return true  // Block transition events
                 case (.resizing, .moving):
-                    guard startTracking(at: event.location) else {
+                    guard startTracking(at: event.location, state: nextState) else {
                         resetTrackingState()
                         return false
                     }
@@ -207,17 +225,23 @@ class Tracker {
                     break
             }
         }
-        
+
         if requireDragToActivate && !isDragEvent {
             return false  // Only respond to drag events when drag-only mode is enabled
         }
-        
+
         if !requireDragToActivate && !isMoveEvent && !isDragEvent {
             return false  // In normal mode, respond to both move and drag events
         }
 
         var absorbEvent = false
         let nextState = state(for: event.flags)
+
+        guard nextState != .idle else { return false }
+        guard dependencies.trusted() else {
+            log(.error, "⚠️ Accessibility permission unavailable; passing event through")
+            return false
+        }
 
         switch (currentState, nextState) {
             // .idle -> X
@@ -226,7 +250,7 @@ class Tracker {
                 break
             case (.idle, .moving),
                  (.idle, .resizing):
-                guard startTracking(at: event.location) else {
+                guard startTracking(at: event.location, state: nextState) else {
                     resetTrackingState()
                     return false
                 }
@@ -237,8 +261,10 @@ class Tracker {
 
             // .moving -> X
             case (.moving, .moving):
-                move(delta: event.mouseDelta)
-                absorbEvent = true  // Block default actions while moving
+                absorbEvent = move(
+                    delta: event.mouseDelta,
+                    pointerLocation: event.location
+                )  // Block default actions while moving
             case (.moving, .idle),
                  (.moving, .resizing):
                 break
@@ -247,7 +273,7 @@ class Tracker {
             case (.resizing, .idle):
                 break
             case (.resizing, .moving):
-                guard startTracking(at: event.location) else {
+                guard startTracking(at: event.location, state: nextState) else {
                     resetTrackingState()
                     return false
                 }
@@ -256,8 +282,7 @@ class Tracker {
                 }
                 absorbEvent = true
             case (.resizing, .resizing):
-                resize(delta: event.mouseDelta)
-                absorbEvent = true  // Block default actions while resizing
+                absorbEvent = resize(delta: event.mouseDelta)  // Block default actions while resizing
         }
 
         currentState = nextState
@@ -267,10 +292,27 @@ class Tracker {
 
 
     private func resetTrackingState() {
+        restoreCursor()
         currentState = .idle
         lastEventTime = 0
         activeDragButton = nil
         trackingInfo.reset()
+    }
+
+    private func setCursor(for kind: CursorKind) {
+        if priorCursor == nil {
+            priorCursor = dependencies.cursorCurrent()
+        }
+        guard activeCursor != kind else { return }
+        dependencies.cursorSet(dependencies.cursorFor(kind))
+        activeCursor = kind
+    }
+
+    private func restoreCursor() {
+        guard let priorCursor else { return }
+        dependencies.cursorSet(priorCursor)
+        self.priorCursor = nil
+        activeCursor = nil
     }
 
 
@@ -289,51 +331,72 @@ class Tracker {
 
 
     @discardableResult
-    private func startTracking(at location: CGPoint) -> Bool {
+    private func startTracking(at location: CGPoint, state: State) -> Bool {
         trackingInfo.reset()
 
-        guard isTrusted(prompt: false) else {
-            log(.debug, "❌ Accessibility not trusted, cannot track window")
+        guard let trackedWindow = dependencies.windowAt(location),
+              let origin = trackedWindow.origin(),
+              let size = trackedWindow.size() else { return false }
+
+        let corner = Current.defaults().bool(forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
+            ? Corner.corner(for: location - origin, in: size)
+            : .bottomRight
+        switch state {
+        case .moving:
+            guard trackedWindow.canSetOrigin() else { return false }
+        case .resizing:
+            guard trackedWindow.canSetSize() else { return false }
+            if case .bottomRight = corner {
+                break
+            } else {
+                guard trackedWindow.canSetOrigin() else { return false }
+            }
+        case .idle:
             return false
         }
-        
-        guard
-            let trackedWindow = AXUIElement.window(at: location),
-            let origin = trackedWindow.origin,
-            let size = trackedWindow.size
-        else { return false }
-        trackingInfo.time = CACurrentMediaTime()
+
+        trackingInfo.time = dependencies.now()
+        lastEventTime = trackingInfo.time
         trackingInfo.window = trackedWindow
         trackingInfo.origin = origin
         trackingInfo.size = size
-        if Current.defaults().bool(forKey: DefaultsKeys.resizeFromNearestCorner.rawValue) {
-            trackingInfo.corner = .corner(for: location - origin, in: size)
-        } else {
-            trackingInfo.corner = .bottomRight
-        }
+        trackingInfo.corner = corner
+        setCursor(for: state == .moving ? .move : .resize(corner))
         return true
     }
 
 
-    private func move(delta: Delta) {
+    private func move(delta: Delta, pointerLocation: CGPoint) -> Bool {
         guard let window = trackingInfo.window else {
             log(.debug, "No window!")
-            return
+            resetTrackingState()
+            return false
         }
 
-        trackingInfo.origin += delta
+        trackingInfo.origin = constrainedOrigin(
+            proposed: trackingInfo.origin + delta,
+            windowSize: trackingInfo.size,
+            displays: dependencies.displays(),
+            referencePoint: pointerLocation
+        )
 
-        guard (CACurrentMediaTime() - trackingInfo.time) > Tracker.moveFilterInterval else { return }
+        guard (dependencies.now() - trackingInfo.time) > Tracker.moveFilterInterval else { return true }
 
-        window.origin = trackingInfo.origin
-        trackingInfo.time = CACurrentMediaTime()
+        guard window.setOrigin(trackingInfo.origin), let appliedOrigin = window.origin() else {
+            resetTrackingState()
+            return false
+        }
+        trackingInfo.origin = appliedOrigin
+        trackingInfo.time = dependencies.now()
+        return true
     }
 
 
-    private func resize(delta: Delta) {
+    private func resize(delta: Delta) -> Bool {
         guard let window = trackingInfo.window else {
             log(.debug, "No window!")
-            return
+            resetTrackingState()
+            return false
         }
 
         switch trackingInfo.corner {
@@ -350,17 +413,69 @@ class Tracker {
                 trackingInfo.size += Delta(dx: -delta.dx, dy: delta.dy)
         }
 
-        guard (CACurrentMediaTime() - trackingInfo.time) > Tracker.resizeFilterInterval else { return }
-
-        switch trackingInfo.corner {
-            case .topLeft, .topRight, .bottomLeft:
-                window.origin = trackingInfo.origin
-                window.size = trackingInfo.size
-            case .bottomRight:
-                window.size = trackingInfo.size
+        guard trackingInfo.origin.x.isFinite, trackingInfo.origin.y.isFinite,
+              trackingInfo.size.width.isFinite, trackingInfo.size.height.isFinite else {
+            resetTrackingState()
+            return false
         }
 
-        trackingInfo.time = CACurrentMediaTime()
+        let fixedRightEdge = trackingInfo.origin.x + trackingInfo.size.width
+        let fixedBottomEdge = trackingInfo.origin.y + trackingInfo.size.height
+        if trackingInfo.size.width < 1 {
+            trackingInfo.size.width = 1
+            if trackingInfo.corner == .topLeft || trackingInfo.corner == .bottomLeft {
+                trackingInfo.origin.x = fixedRightEdge - trackingInfo.size.width
+            }
+        }
+        if trackingInfo.size.height < 1 {
+            trackingInfo.size.height = 1
+            if trackingInfo.corner == .topLeft || trackingInfo.corner == .topRight {
+                trackingInfo.origin.y = fixedBottomEdge - trackingInfo.size.height
+            }
+        }
+
+        guard (dependencies.now() - trackingInfo.time) > Tracker.resizeFilterInterval else { return true }
+
+        let requestedOrigin = trackingInfo.origin
+        let requestedSize = trackingInfo.size
+        guard window.setSize(requestedSize), let appliedSize = window.size() else {
+            resetTrackingState()
+            return false
+        }
+
+        let appliedRequestedOrigin: CGPoint
+        switch trackingInfo.corner {
+            case .topLeft:
+                appliedRequestedOrigin = CGPoint(
+                    x: requestedOrigin.x + requestedSize.width - appliedSize.width,
+                    y: requestedOrigin.y + requestedSize.height - appliedSize.height
+                )
+            case .topRight:
+                appliedRequestedOrigin = CGPoint(
+                    x: requestedOrigin.x,
+                    y: requestedOrigin.y + requestedSize.height - appliedSize.height
+                )
+            case .bottomRight:
+                appliedRequestedOrigin = requestedOrigin
+            case .bottomLeft:
+                appliedRequestedOrigin = CGPoint(
+                    x: requestedOrigin.x + requestedSize.width - appliedSize.width,
+                    y: requestedOrigin.y
+                )
+        }
+
+        if trackingInfo.corner != .bottomRight && !window.setOrigin(appliedRequestedOrigin) {
+            resetTrackingState()
+            return false
+        }
+        guard let appliedOrigin = window.origin() else {
+            resetTrackingState()
+            return false
+        }
+        trackingInfo.origin = appliedOrigin
+        trackingInfo.size = appliedSize
+        trackingInfo.time = dependencies.now()
+        return true
     }
 
 }

@@ -24,6 +24,9 @@ class PreferencesController: NSWindowController {
 
     @IBOutlet weak var resizeFromNearestCorner: NSButton!
     @IBOutlet weak var resizeInfoLabel: NSTextField!
+    @IBOutlet weak var quickStartLabel: NSTextField!
+    @IBOutlet weak var chordSummaryLabel: NSTextField!
+    @IBOutlet weak var modifierConflictLabel: NSTextField!
 
     @IBOutlet weak var showMenuIcon: NSButton!
     @IBOutlet weak var launchAtLogin: NSButton!
@@ -32,15 +35,14 @@ class PreferencesController: NSWindowController {
     @IBOutlet weak var versionLabel: NSTextField!
     @IBOutlet weak var accessibilityStatusLabel: NSTextField!
     @IBOutlet weak var openSystemSettingsButton: NSButton!
-    @IBOutlet weak var githubLink: NSTextField!
+    @IBOutlet weak var githubLink: NSButton!
     
-    private var permissionMonitorTimer: Timer?
-
     override func windowDidLoad() {
         super.windowDidLoad()
         updateAccessibilityStatus()
         updateLaunchAtLoginState()
         updateCopy()
+        updateModifierConflictStatus()
         setupGitHubLink()
     }
 
@@ -49,7 +51,7 @@ class PreferencesController: NSWindowController {
         updateAccessibilityStatus()
         updateLaunchAtLoginState()
         updateCopy()
-        startPermissionMonitoring()
+        updateModifierConflictStatus()
     }
 
 
@@ -70,7 +72,8 @@ class PreferencesController: NSWindowController {
                 let resize = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
                 guard !modifierBindingsConflict(move: updated, resize: resize) else {
                     sender.state = modifiers.contains(m) ? .on : .off
-                    NSSound.beep()
+                    modifierConflictLabel?.isHidden = false
+                    modifierConflictLabel?.stringValue = "Move and Resize modifiers must differ."
                     return
                 }
                 try? updated.save(forKey: .moveModifiers, defaults: Current.defaults())
@@ -81,12 +84,14 @@ class PreferencesController: NSWindowController {
                 let move = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
                 guard !modifierBindingsConflict(move: move, resize: updated) else {
                     sender.state = modifiers.contains(m) ? .on : .off
-                    NSSound.beep()
+                    modifierConflictLabel?.isHidden = false
+                    modifierConflictLabel?.stringValue = "Move and Resize modifiers must differ."
                     return
                 }
                 try? updated.save(forKey: .resizeModifiers, defaults: Current.defaults())
             }
             Tracker.shared?.readModifiers()
+            updateModifierConflictStatus()
         }
     }
 
@@ -137,7 +142,13 @@ class PreferencesController: NSWindowController {
     }
     
     @IBAction func openSystemSettingsClicked(_ sender: Any) {
-        NSWorkspace.shared.open(Links.securitySystemPreferences)
+        // Ask Accessibility for the native prompt first. On macOS versions
+        // where the prompt is unavailable, retain the direct System Settings
+        // fallback used by the existing UI.
+        if !isTrusted(prompt: true) {
+            NSWorkspace.shared.open(Links.securitySystemPreferences)
+        }
+        updateAccessibilityStatus()
     }
     
     @IBAction func quitClicked(_ sender: Any) {
@@ -145,17 +156,11 @@ class PreferencesController: NSWindowController {
     }
     
     private func setupGitHubLink() {
-        let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(githubLinkClicked(_:)))
-        githubLink.addGestureRecognizer(clickGesture)
-        
-        // Add tracking area for cursor changes
-        let trackingArea = NSTrackingArea(
-            rect: githubLink.bounds,
-            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-            owner: self,
-            userInfo: ["element": "githubLink"]
-        )
-        githubLink.addTrackingArea(trackingArea)
+        githubLink.target = self
+        githubLink.action = #selector(githubLinkClicked(_:))
+        githubLink.setAccessibilityRole(.button)
+        githubLink.setAccessibilityLabel("View Appresize on GitHub")
+        githubLink.setAccessibilityHelp("Opens the Appresize source repository in your browser")
     }
     
     @objc private func githubLinkClicked(_ sender: Any) {
@@ -163,27 +168,11 @@ class PreferencesController: NSWindowController {
         NSWorkspace.shared.open(url)
     }
     
-    override func mouseEntered(with event: NSEvent) {
-        if let userInfo = event.trackingArea?.userInfo,
-           let element = userInfo["element"] as? String,
-           element == "githubLink" {
-            NSCursor.pointingHand.set()
-        }
-    }
-    
-    override func mouseExited(with event: NSEvent) {
-        if let userInfo = event.trackingArea?.userInfo,
-           let element = userInfo["element"] as? String,
-           element == "githubLink" {
-            NSCursor.arrow.set()
-        }
-    }
 }
 
 extension PreferencesController: NSWindowDelegate {
     
     func windowWillClose(_ notification: Notification) {
-        stopPermissionMonitoring()
     }
 
     func windowDidChangeOcclusionState(_ notification: Notification) {
@@ -220,10 +209,11 @@ extension PreferencesController: NSWindowDelegate {
 
         updateAccessibilityStatus()
         updateCopy()
+        updateModifierConflictStatus()
     }
 
-    func updateAccessibilityStatus() {
-        let isEnabled = isTrusted(prompt: false)
+    func updateAccessibilityStatus(trusted trustedState: Bool? = nil) {
+        let isEnabled = trustedState ?? isTrusted(prompt: false)
         
         if isEnabled {
             accessibilityStatusLabel?.isHidden = true
@@ -242,6 +232,22 @@ extension PreferencesController: NSWindowDelegate {
             : "Resizing will act on the lower right corner of the window."
 
         versionLabel?.stringValue = appVersion(short: true)
+
+        let move = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
+        let resize = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
+        let moveChord = move.symbolDescription.isEmpty ? "no modifiers" : move.symbolDescription
+        let resizeChord = resize.symbolDescription.isEmpty ? "no modifiers" : resize.symbolDescription
+        quickStartLabel?.stringValue = "Hold \(moveChord) and move the pointer to move a window; hold \(resizeChord) to resize it."
+        chordSummaryLabel?.stringValue = "Move: \(moveChord)  •  Resize: \(resizeChord)"
+    }
+
+    private func updateModifierConflictStatus() {
+        let move = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
+        let resize = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
+        modifierConflictLabel?.isHidden = !modifierBindingsConflict(move: move, resize: resize)
+        if modifierBindingsConflict(move: move, resize: resize) {
+            modifierConflictLabel?.stringValue = "Move and Resize modifiers must differ."
+        }
     }
 
     private func updateLaunchAtLoginState() {
@@ -270,18 +276,4 @@ extension PreferencesController: NSWindowDelegate {
         alert.runModal()
     }
     
-    private func startPermissionMonitoring() {
-        // Stop any existing timer
-        stopPermissionMonitoring()
-        
-        // Check accessibility permissions every 2 seconds while preferences window is open
-        permissionMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.updateAccessibilityStatus()
-        }
-    }
-    
-    private func stopPermissionMonitoring() {
-        permissionMonitorTimer?.invalidate()
-        permissionMonitorTimer = nil
-    }
 }

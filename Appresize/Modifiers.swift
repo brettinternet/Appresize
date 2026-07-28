@@ -87,6 +87,21 @@ extension Modifiers: CustomStringConvertible {
 }
 
 
+extension Modifiers {
+    /// Compact modifier glyphs suitable for Settings copy and VoiceOver.
+    var symbolDescription: String {
+        let ordered: [(Modifiers, String)] = [
+            (.command, "⌘"),
+            (.alt, "⌥"),
+            (.control, "⌃"),
+            (.shift, "⇧"),
+            (.fn, "fn")
+        ]
+        return ordered.compactMap { contains($0.0) ? $0.1 : nil }.joined(separator: " ")
+    }
+}
+
+
 extension Modifiers: Defaultable {
     static var defaultValue: Any { return K.defaultRawValue }
     init(forKey key: DefaultsKeys, defaults: UserDefaults) {

@@ -9,9 +9,21 @@
 import Foundation
 import Cocoa
 
+/// The small window surface Tracker needs while an operation is active.
+/// Production windows are backed by AXUIElement; tests provide an in-memory
+/// implementation without creating an event tap or querying Accessibility.
+struct TrackingWindow {
+    let origin: () -> CGPoint?
+    let size: () -> CGSize?
+    let canSetOrigin: () -> Bool
+    let canSetSize: () -> Bool
+    let setOrigin: (CGPoint) -> Bool
+    let setSize: (CGSize) -> Bool
+}
+
 class TrackingInfo {
     var time: CFTimeInterval = 0
-    var window: AXUIElement? = nil
+    var window: TrackingWindow? = nil
     var origin: CGPoint = .zero
     var size: CGSize = .zero
     var corner: Corner = .bottomRight

@@ -15,6 +15,10 @@ class AppStateMachine {
     var stateMachine: StateMachine<AppStateMachine>!
     weak var delegate: AppStateMachineDelegate?
 
+    /// Login-item launches must be silent. The app delegate owns this policy so
+    /// normal user-initiated activation still follows the existing permission flow.
+    var suppressActivationAlerts = false
+
     var state: State {
         get {
             return stateMachine.state
@@ -24,8 +28,8 @@ class AppStateMachine {
         }
     }
 
-    init() {
-        stateMachine = StateMachine<AppStateMachine>(initialState: .launching, delegate: self)
+    init(initialState: State = .launching) {
+        stateMachine = StateMachine<AppStateMachine>(initialState: initialState, delegate: self)
     }
 }
 
@@ -91,7 +95,7 @@ extension AppStateMachine: StateMachineDelegate {
             case (.launching, .validatingState):
                 checkState()
             case (.validatingState, .activating), (.deactivated, .activating):
-                activate(showAlert: true, keepTrying: true)
+                activate(showAlert: !suppressActivationAlerts, keepTrying: true)
             default:
                 break
         }
@@ -130,5 +134,3 @@ extension AppStateMachine {
     }
 
 }
-
-
