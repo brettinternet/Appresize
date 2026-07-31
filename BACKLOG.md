@@ -98,7 +98,7 @@ Manual first launch should explain the utility briefly, while background login l
 #### Implementation tasks
 
 - [x] T1 — Use the existing first-launch value to open Appresize Settings on the first manual launch.
-- [x] T2 — Add one concise quick-start sentence showing the default move and resize modifier chords.
+- [x] T2 — Show the default move and resize modifier chords in clearly labeled shortcut groups.
 - [x] T3 — Add a `Grant Accessibility Access` action that invokes the native system prompt with the current System Settings fallback.
 - [x] T4 — Suppress modal permission alerts when launched as a login item.
 
@@ -130,7 +130,7 @@ The existing AppKit interface should follow current macOS naming, keyboard, and 
 
 - [x] T1 — Rename `Preferences…` to `Settings…`, wire the existing Command-Comma item, and title the window `Appresize Settings`.
 - [x] T2 — Remove irrelevant document-template menus and disable minimize for the Settings window.
-- [x] T3 — Display modifier keys as `⌘`, `⌥`, `⌃`, `⇧`, and `fn`, including one readable shortcut sentence.
+- [x] T3 — Display modifier keys as `⌘`, `⌥`, `⌃`, `⇧`, and `fn` in clearly labeled Move and Resize groups.
 - [x] T4 — Replace conflict-only beeps with the inline message `Move and Resize modifiers must differ.`
 - [x] T5 — Replace the mouse-only GitHub field with a keyboard- and VoiceOver-accessible link.
 - [x] T6 — Add standard `About Appresize` and `Report an Issue…` commands using existing app metadata and URLs.
@@ -203,7 +203,7 @@ The Tracker state machine and launch behavior need deterministic coverage withou
 - [ ] DOD1 — `task test:unit` passes locally with Appresize stopped and in CI.
 - [x] DOD2 — The test seam remains internal and introduces no production abstraction beyond what tests exercise.
 
-Evidence: `task test:unit` passes 46 tests locally; the XCTest host skips production services and Tracker tests use the no-tap seam. Preflight reports a running Appresize process explicitly.
+Evidence: `task test:unit` passes 47 tests locally; the XCTest host skips production services and Tracker tests use the no-tap seam. Preflight reports a running Appresize process explicitly.
 
 ## Later
 

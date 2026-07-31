@@ -24,7 +24,6 @@ class PreferencesController: NSWindowController {
 
     @IBOutlet weak var resizeFromNearestCorner: NSButton!
     @IBOutlet weak var resizeInfoLabel: NSTextField!
-    @IBOutlet weak var quickStartLabel: NSTextField!
     @IBOutlet weak var modifierConflictLabel: NSTextField!
 
     @IBOutlet weak var showMenuIcon: NSButton!
@@ -232,6 +231,7 @@ extension PreferencesController: NSWindowDelegate {
             accessibilityStatusLabel?.textColor = NSColor.systemOrange
             openSystemSettingsButton?.isHidden = false
         }
+        resizeSettingsWindow(contentHeight: isEnabled ? 230 : 282)
     }
     
     func updateCopy() {
@@ -240,12 +240,25 @@ extension PreferencesController: NSWindowDelegate {
             : "Resizing will act on the lower right corner of the window."
 
         versionLabel?.stringValue = appVersion(short: true)
+    }
 
-        let move = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
-        let resize = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
-        let moveChord = move.symbolDescription.isEmpty ? "no modifiers" : move.symbolDescription
-        let resizeChord = resize.symbolDescription.isEmpty ? "no modifiers" : resize.symbolDescription
-        quickStartLabel?.stringValue = "Hold \(moveChord) and move the pointer to move a window.\nHold \(resizeChord) to resize it."
+    private func resizeSettingsWindow(contentHeight: CGFloat) {
+        guard let window else { return }
+        let contentSize = NSSize(width: 390, height: contentHeight)
+        guard window.contentView?.frame.size != contentSize else { return }
+
+        let currentFrame = window.frame
+        let targetFrame = window.frameRect(
+            forContentRect: NSRect(origin: .zero, size: contentSize)
+        )
+        let origin = NSPoint(
+            x: currentFrame.minX,
+            y: currentFrame.maxY - targetFrame.height
+        )
+        window.setFrame(
+            NSRect(origin: origin, size: targetFrame.size),
+            display: window.isVisible
+        )
     }
 
     private func updateModifierConflictStatus() {

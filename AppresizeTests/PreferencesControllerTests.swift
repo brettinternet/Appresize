@@ -4,7 +4,28 @@ import XCTest
 
 @MainActor
 final class PreferencesControllerTests: XCTestCase {
-    func testModifierClickRefreshesShortcutCopy() throws {
+    func testAccessibilityStatusOnlyReservesSpaceWhenPermissionIsMissing() throws {
+        let controller = PreferencesController(windowNibName: "PreferencesController")
+        controller.loadWindow()
+
+        controller.updateAccessibilityStatus(trusted: false)
+        XCTAssertEqual(controller.window?.contentView?.frame.size, NSSize(width: 390, height: 282))
+        let expandedTopEdge = try XCTUnwrap(controller.window).frame.maxY
+        XCTAssertFalse(controller.accessibilityStatusLabel.isHidden)
+        XCTAssertFalse(controller.openSystemSettingsButton.isHidden)
+        XCTAssertLessThanOrEqual(
+            controller.openSystemSettingsButton.frame.maxY,
+            controller.accessibilityStatusLabel.frame.minY
+        )
+
+        controller.updateAccessibilityStatus(trusted: true)
+        XCTAssertEqual(controller.window?.contentView?.frame.size, NSSize(width: 390, height: 230))
+        XCTAssertEqual(controller.window?.frame.maxY, expandedTopEdge)
+        XCTAssertTrue(controller.accessibilityStatusLabel.isHidden)
+        XCTAssertTrue(controller.openSystemSettingsButton.isHidden)
+    }
+
+    func testModifierClickUpdatesStoredShortcut() throws {
         let defaults = testUserDefaults()
         registerDefaultPreferences(in: defaults)
         try Modifiers<Move>([.control, .fn]).save(forKey: .moveModifiers, defaults: defaults)
@@ -18,7 +39,6 @@ final class PreferencesControllerTests: XCTestCase {
         let moveButtons = (0..<5).map { _ in NSButton() }
         let resizeButtons = (0..<5).map { _ in NSButton() }
         let resizeInfoLabel = NSTextField(labelWithString: "")
-        let quickStartLabel = NSTextField(labelWithString: "")
         let conflictLabel = NSTextField(labelWithString: "")
         let versionLabel = NSTextField(labelWithString: "")
 
@@ -33,7 +53,6 @@ final class PreferencesControllerTests: XCTestCase {
         controller.resizeFn = resizeButtons[3]
         controller.resizeShift = resizeButtons[4]
         controller.resizeInfoLabel = resizeInfoLabel
-        controller.quickStartLabel = quickStartLabel
         controller.modifierConflictLabel = conflictLabel
         controller.versionLabel = versionLabel
 
@@ -44,9 +63,7 @@ final class PreferencesControllerTests: XCTestCase {
         controller.updateCopy()
         controller.modifierClicked(resizeButtons[4])
 
-        XCTAssertEqual(
-            quickStartLabel.stringValue,
-            "Hold ⌃ fn and move the pointer to move a window.\nHold fn to resize it."
-        )
+        let updated = Modifiers<Resize>(forKey: .resizeModifiers, defaults: defaults)
+        XCTAssertEqual(updated, [.fn])
     }
 }
