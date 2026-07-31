@@ -28,9 +28,9 @@ final class TrackerTests: XCTestCase {
 
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
         now = 4
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl, dx: 1), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl, dx: 1, location: CGPoint(x: 1, y: 0)), type: .mouseMoved))
         now = 8
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl, dx: 1), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl, dx: 1, location: CGPoint(x: 2, y: 0)), type: .mouseMoved))
         XCTAssertEqual(window.origin.x, 2)
     }
 
@@ -97,7 +97,7 @@ final class TrackerTests: XCTestCase {
 
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
         now = 1
-        XCTAssertFalse(tracker.handleEvent(event(flags: .maskControl, dx: 1), type: .mouseMoved))
+        XCTAssertFalse(tracker.handleEvent(event(flags: .maskControl, dx: 1, location: CGPoint(x: 1, y: 0)), type: .mouseMoved))
         now = 2
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
     }
@@ -109,10 +109,10 @@ final class TrackerTests: XCTestCase {
 
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate), type: .mouseMoved))
         now = 1
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -90), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -90, location: CGPoint(x: -90, y: 0)), type: .mouseMoved))
         XCTAssertEqual(window.size.width, 50)
         now = 2
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 10), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 10, location: CGPoint(x: -80, y: 0)), type: .mouseMoved))
         XCTAssertEqual(window.size.width, 60)
     }
 
@@ -122,11 +122,11 @@ final class TrackerTests: XCTestCase {
 
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate), type: .mouseMoved))
         now = 0.005
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 1), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 1, location: CGPoint(x: 1, y: 0)), type: .mouseMoved))
         now = 0.010
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 2), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 2, location: CGPoint(x: 3, y: 0)), type: .mouseMoved))
         now = 0.030
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 3), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 3, location: CGPoint(x: 6, y: 0)), type: .mouseMoved))
 
         XCTAssertEqual(window.size.width, 106)
     }
@@ -174,10 +174,10 @@ final class TrackerTests: XCTestCase {
 
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate), type: .mouseMoved))
         now = 1
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -150), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -150, location: CGPoint(x: -150, y: 0)), type: .mouseMoved))
         XCTAssertEqual(window.size.width, 50)
         now = 2
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 10), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 10, location: CGPoint(x: -140, y: 0)), type: .mouseMoved))
         XCTAssertEqual(window.size.width, 60)
         XCTAssertEqual(cursorSets, 1)
     }
@@ -220,7 +220,59 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 10, location: CGPoint(x: 1_001, y: 100)),
             type: .mouseMoved
         ))
-        XCTAssertEqual(window.origin.x, 930)
+        XCTAssertEqual(window.origin.x, 931)
+    }
+
+    func testPinnedPointerIgnoresRawDeltaThenFollowsAbsoluteLocation() throws {
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window)
+        let location = CGPoint(x: 100, y: 100)
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: location),
+            type: .mouseMoved
+        ))
+        now = 1
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, dx: 20, dy: 19, location: location),
+            type: .mouseMoved
+        ))
+        XCTAssertEqual(window.origin, .zero)
+
+        now = 2
+        let movedLocation = CGPoint(x: 100.5, y: 101.25)
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, dx: 0, dy: 0, location: movedLocation),
+            type: .mouseMoved
+        ))
+        XCTAssertEqual(window.origin, CGPoint(x: 0.5, y: 1.25))
+    }
+
+    func testMoveAnchorAccumulatesThroughUnappliedOriginWritesAndReverses() throws {
+        let window = FakeWindow()
+        window.originWriteThreshold = 3
+        let tracker = try makeTracker(window: window)
+        let start = CGPoint(x: 100, y: 100)
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: start),
+            type: .mouseMoved
+        ))
+        for step in 1...3 {
+            now = CFAbsoluteTime(step)
+            XCTAssertTrue(tracker.handleEvent(
+                event(flags: .maskControl, location: CGPoint(x: 100 + step, y: 100)),
+                type: .mouseMoved
+            ))
+        }
+        XCTAssertEqual(window.origin, CGPoint(x: 3, y: 0))
+
+        now = 4
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: start),
+            type: .mouseMoved
+        ))
+        XCTAssertEqual(window.origin, .zero)
     }
 
     func testSlowAndFastMotionProduceTheSameFinalOrigin() throws {
@@ -508,6 +560,7 @@ private final class FakeWindow {
     var canSetSize = true
     var failOriginWrite = false
     var failSizeWrite = false
+    var originWriteThreshold: CGFloat = 0
     var minimumWidth: CGFloat = 1
     var minimumHeight: CGFloat = 1
 
@@ -518,6 +571,10 @@ private final class FakeWindow {
         canSetSize: { [unowned self] in self.canSetSize },
         setOrigin: { [unowned self] value in
             guard !self.failOriginWrite else { return false }
+            if self.originWriteThreshold > 0,
+               value.distance(to: self.origin) < self.originWriteThreshold {
+                return true
+            }
             self.origin = value
             return true
         },

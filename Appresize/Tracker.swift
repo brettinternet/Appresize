@@ -197,11 +197,11 @@ class Tracker {
             
             switch (currentState, nextState) {
                 case (.moving, .moving):
-                    let handled = move(delta: event.mouseDelta)
+                    let handled = move(to: event.location)
                     if handled { lastEventTime = currentTime }
                     return handled  // Block all mouse events while moving
                 case (.resizing, .resizing):
-                    let handled = resize(delta: event.mouseDelta)
+                    let handled = resize(delta: trackingDelta(at: event.location))
                     if handled { lastEventTime = currentTime }
                     return handled  // Block all mouse events while resizing
                 case (.moving, .idle), (.resizing, .idle):
@@ -261,7 +261,7 @@ class Tracker {
 
             // .moving -> X
             case (.moving, .moving):
-                absorbEvent = move(delta: event.mouseDelta)  // Block default actions while moving
+                absorbEvent = move(to: event.location)  // Block default actions while moving
             case (.moving, .idle),
                  (.moving, .resizing):
                 break
@@ -279,7 +279,7 @@ class Tracker {
                 }
                 absorbEvent = true
             case (.resizing, .resizing):
-                absorbEvent = resize(delta: event.mouseDelta)  // Block default actions while resizing
+                absorbEvent = resize(delta: trackingDelta(at: event.location))  // Block default actions while resizing
         }
 
         currentState = nextState
@@ -358,20 +358,32 @@ class Tracker {
         trackingInfo.origin = origin
         trackingInfo.size = size
         trackingInfo.corner = corner
+        trackingInfo.location = location
+        trackingInfo.initialOrigin = origin
+        trackingInfo.initialLocation = location
         setCursor(for: state == .moving ? .move : .resize(corner))
         return true
     }
 
 
-    private func move(delta: Delta) -> Bool {
+    private func trackingDelta(at location: CGPoint) -> Delta {
+        let delta = location - trackingInfo.location
+        trackingInfo.location = location
+        return Delta(dx: delta.x, dy: delta.y)
+    }
+
+
+    private func move(to location: CGPoint) -> Bool {
         guard let window = trackingInfo.window else {
             log(.debug, "No window!")
             resetTrackingState()
             return false
         }
 
+        trackingInfo.location = location
+        let displacement = location - trackingInfo.initialLocation
         trackingInfo.origin = constrainedOrigin(
-            proposed: trackingInfo.origin + delta,
+            proposed: trackingInfo.initialOrigin + Delta(dx: displacement.x, dy: displacement.y),
             windowSize: trackingInfo.size,
             displays: dependencies.displays()
         )

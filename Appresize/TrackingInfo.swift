@@ -27,6 +27,9 @@ class TrackingInfo {
     var origin: CGPoint = .zero
     var size: CGSize = .zero
     var corner: Corner = .bottomRight
+    var location: CGPoint = .zero
+    var initialOrigin: CGPoint = .zero
+    var initialLocation: CGPoint = .zero
 
     func reset() {
         time = 0
@@ -34,5 +37,8 @@ class TrackingInfo {
         origin = .zero
         size = .zero
         corner = .bottomRight
+        location = .zero
+        initialOrigin = .zero
+        initialLocation = .zero
     }
 }
