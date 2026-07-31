@@ -164,7 +164,7 @@ class PreferencesController: NSWindowController {
             string: "View on GitHub",
             attributes: [
                 .foregroundColor: NSColor.linkColor,
-                .underlineStyle: NSUnderlineStyle.single.rawValue
+                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
             ]
         )
         githubLink.setAccessibilityRole(.link)
