@@ -39,7 +39,6 @@ class PreferencesController: NSWindowController {
         super.windowDidLoad()
         updateModifierButtonStates()
         updateAccessibilityStatus()
-        alignGeneralCheckboxRows()
         updateLaunchAtLoginState()
         updateCopy()
         updateModifierConflictStatus()
@@ -250,6 +249,7 @@ extension PreferencesController: NSWindowDelegate {
             openSystemSettingsButton?.isHidden = false
         }
         resizeSettingsWindow(contentHeight: isEnabled ? 230 : 282)
+        alignGeneralCheckboxRows()
     }
     
     func updateCopy() {
