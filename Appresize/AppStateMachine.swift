@@ -58,7 +58,7 @@ extension AppStateMachine: StateMachineDelegate {
         case activated
         case deactivated
 
-        func shouldTransition(from: State, to: State) -> Decision<State> {
+        func shouldTransition(from: State, to: State) -> Decision {
             log(.debug, "Transition: \(from) -> \(to)")
 
             switch (from, to) {

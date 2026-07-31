@@ -2,12 +2,6 @@ import Cocoa
 import ServiceManagement
 
 
-protocol PreferencesControllerDelegate: AnyObject {
-    func didRequestRegistrationController()
-    func didRequestTipJarController()
-}
-
-
 class PreferencesController: NSWindowController {
 
     @IBOutlet weak var moveAlt: NSButton!
@@ -180,10 +174,6 @@ class PreferencesController: NSWindowController {
 }
 
 extension PreferencesController: NSWindowDelegate {
-    
-    func windowWillClose(_ notification: Notification) {
-    }
-
     func windowDidChangeOcclusionState(_ notification: Notification) {
         updateModifierButtonStates()
 
@@ -282,8 +272,9 @@ extension PreferencesController: NSWindowDelegate {
     private func updateModifierConflictStatus() {
         let move = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
         let resize = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
-        modifierConflictLabel?.isHidden = !modifierBindingsConflict(move: move, resize: resize)
-        if modifierBindingsConflict(move: move, resize: resize) {
+        let hasConflict = modifierBindingsConflict(move: move, resize: resize)
+        modifierConflictLabel?.isHidden = !hasConflict
+        if hasConflict {
             modifierConflictLabel?.stringValue = "Move and Resize modifiers must differ."
         }
     }

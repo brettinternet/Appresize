@@ -6,9 +6,6 @@
 //  Copyright © 2019 finestructure. All rights reserved.
 //
 
-import Foundation
-
-
 enum State: Int {
     case idle
     case moving

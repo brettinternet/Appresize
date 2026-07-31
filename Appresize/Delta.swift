@@ -4,12 +4,6 @@ import Foundation
 struct Delta {
     var dx: CGFloat
     var dy: CGFloat
-
-    var magnitude: CGFloat {
-        sqrt(dx * dx + dy * dy)
-    }
-
-    static var zero: Self { .init(dx: 0, dy: 0) }
 }
 
 

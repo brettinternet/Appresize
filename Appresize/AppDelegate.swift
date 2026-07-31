@@ -1,6 +1,4 @@
 import Cocoa
-import os
-import UserNotifications
 
 
 func isLoginItemLaunch(_ event: NSAppleEventDescriptor?) -> Bool {

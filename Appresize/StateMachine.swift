@@ -13,15 +13,14 @@
 import Foundation
 
 
-enum Decision<T> {
+enum Decision {
     case `continue`
     case abort
-    case redirect(T)
 }
 
 
 protocol TransitionDelegate {
-    func shouldTransition(from: Self, to: Self) -> Decision<Self>
+    func shouldTransition(from: Self, to: Self) -> Decision
 }
 
 
@@ -46,9 +45,6 @@ class StateMachine<Delegate: StateMachineDelegate> {
             switch state.shouldTransition(from: _state, to: newValue) {
                 case .continue:
                     _state = newValue
-                case .redirect(let newState):
-                    _state = newValue
-                    self.state = newState
                 case .abort:
                     break
             }
@@ -60,4 +56,3 @@ class StateMachine<Delegate: StateMachineDelegate> {
         self.delegate = delegate
     }
 }
-
