@@ -17,7 +17,7 @@
                 <outlet property="moveFn" destination="RzX-et-TGM" id="NgG-2Q-2T0"/>
                 <outlet property="moveShift" destination="cBr-VD-5GB" id="fW9-dz-vKk"/>
                 <outlet property="openSystemSettingsButton" destination="8bC-9T-mxN" id="openSystemSettingsButton-outlet"/>
-                <outlet property="requireDragToActivate" destination="jAC-Hd-tRx" id="requireDragToActivate-outlet"/>
+                <outlet property="requireDragToActivate" destination="dTt-aK-ndS" id="requireDragToActivate-outlet"/>
                 <outlet property="resizeAlt" destination="frh-8a-H0z" id="5fk-e9-bQq"/>
                 <outlet property="resizeCommand" destination="IHA-Hv-cF2" id="qMk-Cv-bBg"/>
                 <outlet property="resizeControl" destination="Vho-Wo-heQ" id="hHk-K6-Pom"/>
@@ -188,7 +188,7 @@
                         </view>
                     </box>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="bBy-AW-VTy">
-                        <rect key="frame" x="210" y="206" width="162" height="18"/>
+                        <rect key="frame" x="210" y="212" width="162" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <string key="toolTip">When enabled, window resizes will use the corner closest to your cursor. When disabled, resizes always use the bottom-right corner.</string>
                         <buttonCell key="cell" type="check" title="Resize from corners" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="Bo4-fU-O3J">
@@ -200,7 +200,7 @@
                         </connections>
                     </button>
                     <button toolTip="Shows or hides the Appresize icon in the menu bar. Use the menu bar icon to access preferences and quit the app." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="pNU-or-TOn">
-                        <rect key="frame" x="210" y="180" width="162" height="18"/>
+                        <rect key="frame" x="210" y="186" width="162" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Show menu icon" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="veU-QV-ewB">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -211,7 +211,7 @@
                         </connections>
                     </button>
                     <button toolTip="Automatically starts Appresize when you log in to your Mac. The app will run in the background and be ready to use immediately." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TnR-QZ-Jig">
-                        <rect key="frame" x="210" y="155" width="162" height="18"/>
+                        <rect key="frame" x="210" y="161" width="162" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Launch at login" bezelStyle="regularSquare" imagePosition="left" inset="2" id="cdX-Sz-m46">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -222,7 +222,7 @@
                         </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dTt-aK-ndS">
-                        <rect key="frame" x="210" y="130" width="162" height="18"/>
+                        <rect key="frame" x="210" y="136" width="162" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <string key="toolTip">When enabled, windows will only resize or move when you drag the mouse while holding modifiers. When disabled, windows respond to any mouse movement while modifiers are held.</string>
                         <buttonCell key="cell" type="check" title="Require mouse drag" bezelStyle="regularSquare" imagePosition="left" inset="2" id="jAC-Hd-tRx">

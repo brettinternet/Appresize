@@ -16,7 +16,7 @@ enum Move: Kind {
 
 enum Resize: Kind {
     static var defaultRawValue: UInt64 {
-        return CGEventFlags([.maskSecondaryFn, .maskControl, .maskAlternate]).rawValue
+        return CGEventFlags([.maskSecondaryFn, .maskControl, .maskShift]).rawValue
     }
 }
 

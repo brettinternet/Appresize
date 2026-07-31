@@ -66,4 +66,29 @@ final class PreferencesControllerTests: XCTestCase {
         let updated = Modifiers<Resize>(forKey: .resizeModifiers, defaults: defaults)
         XCTAssertEqual(updated, [.fn])
     }
+
+    func testGeneralCheckboxRowsAlignWithShortcutRows() throws {
+        let controller = PreferencesController(windowNibName: "PreferencesController")
+        controller.loadWindow()
+        controller.updateAccessibilityStatus(trusted: false)
+
+        let contentView = try XCTUnwrap(controller.window?.contentView)
+        let moveTop = try XCTUnwrap(controller.moveAlt)
+        let resizeTop = try XCTUnwrap(controller.resizeAlt)
+        let moveTopY = contentView.convert(moveTop.bounds, from: moveTop).minY
+        let resizeTopY = contentView.convert(resizeTop.bounds, from: resizeTop).minY
+
+        let generalRows = try [
+            XCTUnwrap(controller.resizeFromNearestCorner),
+            XCTUnwrap(controller.showMenuIcon),
+            XCTUnwrap(controller.launchAtLogin),
+            XCTUnwrap(controller.requireDragToActivate)
+        ]
+        let generalRowYs = generalRows.map {
+            contentView.convert($0.bounds, from: $0).minY
+        }
+        XCTAssertEqual(moveTopY, generalRowYs[0], accuracy: 0.001)
+        XCTAssertEqual(resizeTopY, generalRowYs[0], accuracy: 0.001)
+        XCTAssertEqual(generalRowYs, [212, 186, 161, 136])
+    }
 }
