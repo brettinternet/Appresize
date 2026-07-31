@@ -22,6 +22,25 @@
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
+      <PostActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Stabilize local accessibility identity"
+               scriptText = "/usr/bin/xcrun swift &quot;$PROJECT_DIR/scripts/sign-local-app.swift&quot; &quot;$CODESIGNING_FOLDER_PATH&quot;"
+               shellToInvoke = "/bin/sh">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "8BB8F8E02D1A21740087BA54"
+                     BuildableName = "Appresize.app"
+                     BlueprintName = "Appresize"
+                     ReferencedContainer = "container:Appresize.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PostActions>
    </BuildAction>
    <TestAction
       buildConfiguration = "Debug"
