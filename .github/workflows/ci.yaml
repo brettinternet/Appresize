@@ -31,6 +31,8 @@ jobs:
                      -configuration Debug \
                      -derivedDataPath build \
                      -destination 'platform=macOS'
+          /usr/bin/xcrun swift ./scripts/sign-local-app.swift \
+            build/Build/Products/Debug/Appresize.app
       
       - name: Run tests (with timeout)
         timeout-minutes: 5
@@ -51,6 +53,8 @@ jobs:
                      -derivedDataPath build \
                      -destination 'generic/platform=macOS' \
                      build
+          /usr/bin/xcrun swift ./scripts/sign-local-app.swift \
+            build/Build/Products/Release/Appresize.app
 
       - name: Verify app bundle
         run: |

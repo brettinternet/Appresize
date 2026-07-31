@@ -19,7 +19,6 @@ final class PreferencesControllerTests: XCTestCase {
         let resizeButtons = (0..<5).map { _ in NSButton() }
         let resizeInfoLabel = NSTextField(labelWithString: "")
         let quickStartLabel = NSTextField(labelWithString: "")
-        let chordSummaryLabel = NSTextField(labelWithString: "")
         let conflictLabel = NSTextField(labelWithString: "")
         let versionLabel = NSTextField(labelWithString: "")
 
@@ -35,19 +34,19 @@ final class PreferencesControllerTests: XCTestCase {
         controller.resizeShift = resizeButtons[4]
         controller.resizeInfoLabel = resizeInfoLabel
         controller.quickStartLabel = quickStartLabel
-        controller.chordSummaryLabel = chordSummaryLabel
         controller.modifierConflictLabel = conflictLabel
         controller.versionLabel = versionLabel
 
-        controller.updateCopy()
-        XCTAssertEqual(chordSummaryLabel.stringValue, "Move: ⌃ fn  •  Resize: ⇧ fn")
+        controller.updateModifierButtonStates()
+        XCTAssertEqual(moveButtons.map(\.state), [.off, .off, .on, .on, .off])
+        XCTAssertEqual(resizeButtons.map(\.state), [.off, .off, .off, .on, .on])
 
+        controller.updateCopy()
         controller.modifierClicked(resizeButtons[4])
 
-        XCTAssertEqual(chordSummaryLabel.stringValue, "Move: ⌃ fn  •  Resize: fn")
         XCTAssertEqual(
             quickStartLabel.stringValue,
-            "Hold ⌃ fn and move the pointer to move a window; hold fn to resize it."
+            "Hold ⌃ fn and move the pointer to move a window.\nHold fn to resize it."
         )
     }
 }

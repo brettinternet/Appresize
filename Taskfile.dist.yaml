@@ -29,16 +29,19 @@ tasks:
     desc: Build the app (Debug)
     cmds:
       - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" build
+      - /usr/bin/xcrun swift ./scripts/sign-local-app.swift "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/Appresize.app"
 
   build:release:
     desc: Build the app (Release)
     cmds:
       - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "generic/platform=macOS" build
+      - /usr/bin/xcrun swift ./scripts/sign-local-app.swift "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app"
 
   test:build:
     desc: Build tests
     cmds:
       - xcodebuild build-for-testing -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}"
+      - /usr/bin/xcrun swift ./scripts/sign-local-app.swift "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/Appresize.app"
 
   test:
     desc: Run all tests

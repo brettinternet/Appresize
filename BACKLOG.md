@@ -130,7 +130,7 @@ The existing AppKit interface should follow current macOS naming, keyboard, and 
 
 - [x] T1 — Rename `Preferences…` to `Settings…`, wire the existing Command-Comma item, and title the window `Appresize Settings`.
 - [x] T2 — Remove irrelevant document-template menus and disable minimize for the Settings window.
-- [x] T3 — Display modifier keys as `⌘`, `⌥`, `⌃`, `⇧`, and `fn`, including a readable chord summary.
+- [x] T3 — Display modifier keys as `⌘`, `⌥`, `⌃`, `⇧`, and `fn`, including one readable shortcut sentence.
 - [x] T4 — Replace conflict-only beeps with the inline message `Move and Resize modifiers must differ.`
 - [x] T5 — Replace the mouse-only GitHub field with a keyboard- and VoiceOver-accessible link.
 - [x] T6 — Add standard `About Appresize` and `Report an Issue…` commands using existing app metadata and URLs.

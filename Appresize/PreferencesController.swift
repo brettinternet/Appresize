@@ -25,7 +25,6 @@ class PreferencesController: NSWindowController {
     @IBOutlet weak var resizeFromNearestCorner: NSButton!
     @IBOutlet weak var resizeInfoLabel: NSTextField!
     @IBOutlet weak var quickStartLabel: NSTextField!
-    @IBOutlet weak var chordSummaryLabel: NSTextField!
     @IBOutlet weak var modifierConflictLabel: NSTextField!
 
     @IBOutlet weak var showMenuIcon: NSButton!
@@ -39,6 +38,7 @@ class PreferencesController: NSWindowController {
     
     override func windowDidLoad() {
         super.windowDidLoad()
+        updateModifierButtonStates()
         updateAccessibilityStatus()
         updateLaunchAtLoginState()
         updateCopy()
@@ -48,6 +48,7 @@ class PreferencesController: NSWindowController {
 
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
+        updateModifierButtonStates()
         updateAccessibilityStatus()
         updateLaunchAtLoginState()
         updateCopy()
@@ -159,7 +160,15 @@ class PreferencesController: NSWindowController {
     private func setupGitHubLink() {
         githubLink.target = self
         githubLink.action = #selector(githubLinkClicked(_:))
-        githubLink.setAccessibilityRole(.button)
+        githubLink.isBordered = false
+        githubLink.attributedTitle = NSAttributedString(
+            string: "View on GitHub",
+            attributes: [
+                .foregroundColor: NSColor.linkColor,
+                .underlineStyle: NSUnderlineStyle.single.rawValue
+            ]
+        )
+        githubLink.setAccessibilityRole(.link)
         githubLink.setAccessibilityLabel("View Appresize on GitHub")
         githubLink.setAccessibilityHelp("Opens the Appresize source repository in your browser")
     }
@@ -177,25 +186,7 @@ extension PreferencesController: NSWindowDelegate {
     }
 
     func windowDidChangeOcclusionState(_ notification: Notification) {
-        do {
-            let prefs = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
-            let buttons = [moveAlt, moveCommand, moveControl, moveFn, moveShift]
-            let allModifiers: [Modifiers<Move>] = [.alt, .command, .control, .fn, .shift]
-            let buttonForModifier = Dictionary(uniqueKeysWithValues: zip(allModifiers, buttons))
-            for (modifier, button) in buttonForModifier {
-                button?.state = prefs.contains(modifier) ? .on : .off
-            }
-        }
-
-        do {
-            let prefs = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
-            let buttons = [resizeAlt, resizeCommand, resizeControl, resizeFn, resizeShift]
-            let allModifiers: [Modifiers<Resize>] = [.alt, .command, .control, .fn, .shift]
-            let buttonForModifier = Dictionary(uniqueKeysWithValues: zip(allModifiers, buttons))
-            for (modifier, button) in buttonForModifier {
-                button?.state = prefs.contains(modifier) ? .on : .off
-            }
-        }
+        updateModifierButtonStates()
 
         resizeFromNearestCorner?.state = Current.defaults().bool(forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
             ? .on : .off
@@ -211,6 +202,22 @@ extension PreferencesController: NSWindowDelegate {
         updateAccessibilityStatus()
         updateCopy()
         updateModifierConflictStatus()
+    }
+
+    func updateModifierButtonStates() {
+        let move = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
+        let moveButtons = [moveAlt, moveCommand, moveControl, moveFn, moveShift]
+        let moveModifiers: [Modifiers<Move>] = [.alt, .command, .control, .fn, .shift]
+        for (modifier, button) in zip(moveModifiers, moveButtons) {
+            button?.state = move.contains(modifier) ? .on : .off
+        }
+
+        let resize = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
+        let resizeButtons = [resizeAlt, resizeCommand, resizeControl, resizeFn, resizeShift]
+        let resizeModifiers: [Modifiers<Resize>] = [.alt, .command, .control, .fn, .shift]
+        for (modifier, button) in zip(resizeModifiers, resizeButtons) {
+            button?.state = resize.contains(modifier) ? .on : .off
+        }
     }
 
     func updateAccessibilityStatus(trusted trustedState: Bool? = nil) {
@@ -238,8 +245,7 @@ extension PreferencesController: NSWindowDelegate {
         let resize = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
         let moveChord = move.symbolDescription.isEmpty ? "no modifiers" : move.symbolDescription
         let resizeChord = resize.symbolDescription.isEmpty ? "no modifiers" : resize.symbolDescription
-        quickStartLabel?.stringValue = "Hold \(moveChord) and move the pointer to move a window; hold \(resizeChord) to resize it."
-        chordSummaryLabel?.stringValue = "Move: \(moveChord)  •  Resize: \(resizeChord)"
+        quickStartLabel?.stringValue = "Hold \(moveChord) and move the pointer to move a window.\nHold \(resizeChord) to resize it."
     }
 
     private func updateModifierConflictStatus() {

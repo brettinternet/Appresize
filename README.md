@@ -34,7 +34,7 @@ task copy:release # build and copy the app to /Applications
 Open the app `build/Build/Products/Release/Appresize.app`.
 
 > [!IMPORTANT]  
-> With a new build, you'll have to quit the previously built app, remove and re-add the app entry in MacOS settings Privacy & Security > Accessibility.
+> The build commands above use a stable designated requirement so replacing the app does not invalidate its existing Accessibility grant. Builds made before this change require one final remove-and-re-add in macOS Settings.
 
 ### Unsigned Release
 
