@@ -1,6 +1,6 @@
 # Appresize Backlog
 
-Last reviewed: 2026-07-28
+Last reviewed: 2026-07-30
 
 This backlog favors small, native macOS improvements over new frameworks or broad feature expansion.
 
@@ -32,7 +32,7 @@ The event tap should never interrupt a valid operation or consume input for a wi
 - [x] DOD1 — Focused regression tests cover timeout, non-settable attributes, failed writes, and clamped geometry.
 - [x] DOD2 — Debug and Release builds succeed.
 
-Evidence: 45 focused unit tests pass; Debug test build and universal Release build succeed.
+Evidence: 46 focused unit tests pass; Debug test build and universal Release build succeed.
 
 ### AR-002 — Make local release installation replacement-safe
 
@@ -114,13 +114,13 @@ Manual first launch should explain the utility briefly, while background login l
 - [ ] DOD1 — Manual launch, login launch, permission grant, and permission revocation paths are tested.
 - [x] DOD2 — No onboarding wizard or additional framework is introduced.
 
-Evidence: launch policy and UI wiring are covered statically and by focused tests; live manual/login/grant/revoke paths remain unchecked.
+Evidence: launch policy and UI wiring are covered statically and by focused tests. A live installed-build launch presented Settings, the permission warning, and the System Settings fallback correctly; login-item launch plus grant/revoke transitions remain unchecked.
 
 ## Next
 
 ### AR-005 — Apply native Settings and menu polish
 
-- Status: In progress — accessibility inspection and README screenshot remain
+- Status: In progress — keyboard, VoiceOver, and Accessibility Inspector checks remain
 - Priority: P1
 - Dependencies: None
 
@@ -141,12 +141,12 @@ The existing AppKit interface should follow current macOS naming, keyboard, and 
 - [ ] AC2 — Every Settings control and link is reachable and understandable with keyboard navigation and VoiceOver.
 - [x] AC3 — Invalid modifier combinations explain how to recover.
 
-Evidence: a hosted-app test invokes the Command-Comma menu item and verifies the Settings window opens; both XIBs compile and Debug/Release builds pass. Live keyboard traversal, VoiceOver, Accessibility Inspector, and screenshot checks remain.
+Evidence: a hosted-app test invokes the Command-Comma menu item and verifies the Settings window opens; both XIBs compile and Debug/Release builds pass. Live accessibility-tree inspection confirmed labels and help text for every control and link, and live modifier changes confirmed immediate shortcut-copy and inline-conflict updates. Keyboard traversal, VoiceOver, and Accessibility Inspector checks remain.
 
 #### Definition of Done
 
 - [ ] DOD1 — The Settings window is checked with Accessibility Inspector.
-- [ ] DOD2 — The README screenshot reflects the shipped interface.
+- [x] DOD2 — The README screenshot reflects the shipped interface.
 
 ### AR-006 — Reduce Accessibility polling and hot-path work
 
@@ -203,7 +203,7 @@ The Tracker state machine and launch behavior need deterministic coverage withou
 - [ ] DOD1 — `task test:unit` passes locally with Appresize stopped and in CI.
 - [x] DOD2 — The test seam remains internal and introduces no production abstraction beyond what tests exercise.
 
-Evidence: `task test:unit` passes 45 tests; the XCTest host skips production services and Tracker tests use the no-tap seam. Preflight reports a running Appresize process explicitly.
+Evidence: `task test:unit` passes 46 tests locally; the XCTest host skips production services and Tracker tests use the no-tap seam. Preflight reports a running Appresize process explicitly.
 
 ## Later
 

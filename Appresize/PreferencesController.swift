@@ -91,6 +91,7 @@ class PreferencesController: NSWindowController {
                 try? updated.save(forKey: .resizeModifiers, defaults: Current.defaults())
             }
             Tracker.shared?.readModifiers()
+            updateCopy()
             updateModifierConflictStatus()
         }
     }
