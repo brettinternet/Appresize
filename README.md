@@ -33,9 +33,6 @@ task copy:release # build and copy the app to /Applications
 
 Open the app `build/Build/Products/Release/Appresize.app`.
 
-> [!IMPORTANT]  
-> The shared Appresize scheme and Taskfile builds use a stable designated requirement, so replacing the app does not invalidate its existing Accessibility grant. Builds made before this change require one final remove-and-re-add in macOS Settings.
-
 ### Unsigned Release
 
 Alternatively, to run the unsigned app, clear the quarantine extended attribute at your own risk.
