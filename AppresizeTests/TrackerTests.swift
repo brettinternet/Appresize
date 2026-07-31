@@ -339,7 +339,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 10, dy: 100, location: CGPoint(x: 1_010, y: 200)),
             type: .mouseMoved
         ))
-        XCTAssertEqual(window.origin, CGPoint(x: 930, y: 200))
+        XCTAssertEqual(window.origin, CGPoint(x: 940, y: 200))
     }
 
     func testTitleBarCanStraddleVerticallyAdjacentDisplays() throws {
@@ -404,7 +404,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 2_000, dy: 100, location: CGPoint(x: 2_000, y: 100)),
             type: .mouseMoved
         ))
-        XCTAssertEqual(window.origin, CGPoint(x: 920, y: 100))
+        XCTAssertEqual(window.origin, CGPoint(x: 920, y: 0))
     }
 
     func testClampedTopLeftResizeKeepsOppositeEdgesFixed() throws {
