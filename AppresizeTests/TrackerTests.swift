@@ -220,7 +220,139 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 10, location: CGPoint(x: 1_001, y: 100)),
             type: .mouseMoved
         ))
-        XCTAssertEqual(window.origin.x, 980)
+        XCTAssertEqual(window.origin.x, 930)
+    }
+
+    func testSlowAndFastMotionProduceTheSameFinalOrigin() throws {
+        let displays = [
+            DisplayFrame(visibleFrame: CGRect(x: 0, y: 0, width: 1000, height: 800)),
+            DisplayFrame(visibleFrame: CGRect(x: 1000, y: 0, width: 1000, height: 800))
+        ]
+
+        let slowWindow = FakeWindow()
+        slowWindow.origin = CGPoint(x: 920, y: 100)
+        let slowTracker = try makeTracker(window: slowWindow, displays: { displays })
+        XCTAssertTrue(slowTracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 990, y: 100)),
+            type: .mouseMoved
+        ))
+        for step in 1...7 {
+            now = CFAbsoluteTime(step)
+            XCTAssertTrue(slowTracker.handleEvent(
+                event(flags: .maskControl, dx: 10, location: CGPoint(x: 990 + step * 10, y: 100)),
+                type: .mouseMoved
+            ))
+        }
+
+        now = 0
+        let fastWindow = FakeWindow()
+        fastWindow.origin = CGPoint(x: 920, y: 100)
+        let fastTracker = try makeTracker(window: fastWindow, displays: { displays })
+        XCTAssertTrue(fastTracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 990, y: 100)),
+            type: .mouseMoved
+        ))
+        now = 1
+        XCTAssertTrue(fastTracker.handleEvent(
+            event(flags: .maskControl, dx: 70, location: CGPoint(x: 1_060, y: 100)),
+            type: .mouseMoved
+        ))
+
+        XCTAssertEqual(slowWindow.origin, fastWindow.origin)
+        XCTAssertEqual(fastWindow.origin.x, 990)
+    }
+
+    func testVerticallyOffsetDisplaysConstrainOnlyTheUnreachableGap() throws {
+        let window = FakeWindow()
+        window.origin = CGPoint(x: 920, y: 100)
+        let displays = [
+            DisplayFrame(visibleFrame: CGRect(x: 0, y: 0, width: 1000, height: 800)),
+            DisplayFrame(visibleFrame: CGRect(x: 1000, y: 200, width: 1000, height: 800))
+        ]
+        let tracker = try makeTracker(window: window, displays: { displays })
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 990, y: 100)),
+            type: .mouseMoved
+        ))
+        now = 1
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, dx: 10, location: CGPoint(x: 1_000, y: 100)),
+            type: .mouseMoved
+        ))
+        XCTAssertEqual(window.origin, CGPoint(x: 920, y: 100))
+
+        now = 2
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, dx: 10, dy: 100, location: CGPoint(x: 1_010, y: 200)),
+            type: .mouseMoved
+        ))
+        XCTAssertEqual(window.origin, CGPoint(x: 930, y: 200))
+    }
+
+    func testTitleBarCanStraddleVerticallyAdjacentDisplays() throws {
+        let window = FakeWindow()
+        window.origin = CGPoint(x: 100, y: 790)
+        let displays = [
+            DisplayFrame(visibleFrame: CGRect(x: 0, y: 0, width: 1000, height: 800)),
+            DisplayFrame(visibleFrame: CGRect(x: 0, y: 800, width: 1000, height: 800))
+        ]
+        let tracker = try makeTracker(window: window, displays: { displays })
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 150, y: 790)),
+            type: .mouseMoved
+        ))
+        now = 1
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, dx: 10, location: CGPoint(x: 160, y: 790)),
+            type: .mouseMoved
+        ))
+        XCTAssertEqual(window.origin, CGPoint(x: 110, y: 790))
+    }
+
+    func testGenuineHorizontalGapDoesNotAddDisjointTitleBarFragments() {
+        let displays = [
+            DisplayFrame(visibleFrame: CGRect(x: 0, y: 0, width: 40, height: 800)),
+            DisplayFrame(visibleFrame: CGRect(x: 60, y: 0, width: 40, height: 800)),
+            DisplayFrame(visibleFrame: CGRect(x: 200, y: 0, width: 100, height: 800))
+        ]
+        let constrained = constrainedOrigin(
+            proposed: CGPoint(x: 0, y: 100),
+            windowSize: CGSize(width: 100, height: 100),
+            displays: displays
+        )
+        XCTAssertEqual(constrained, CGPoint(x: 180, y: 100))
+    }
+
+    func testNarrowDisplayCannotSatisfyMinimumTitleBarWidth() {
+        let displays = [
+            DisplayFrame(visibleFrame: CGRect(x: 0, y: 0, width: 67, height: 800)),
+            DisplayFrame(visibleFrame: CGRect(x: 200, y: 0, width: 100, height: 800))
+        ]
+        let constrained = constrainedOrigin(
+            proposed: CGPoint(x: 0, y: 100),
+            windowSize: CGSize(width: 100, height: 100),
+            displays: displays
+        )
+        XCTAssertEqual(constrained, CGPoint(x: 180, y: 100))
+    }
+
+    func testOuterBoundaryKeepsMinimumTitleBarVisible() throws {
+        let window = FakeWindow()
+        let displays = [DisplayFrame(visibleFrame: CGRect(x: 0, y: 0, width: 1000, height: 800))]
+        let tracker = try makeTracker(window: window, displays: { displays })
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 0, y: 100)),
+            type: .mouseMoved
+        ))
+        now = 1
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, dx: 2_000, dy: 100, location: CGPoint(x: 2_000, y: 100)),
+            type: .mouseMoved
+        ))
+        XCTAssertEqual(window.origin, CGPoint(x: 920, y: 100))
     }
 
     func testClampedTopLeftResizeKeepsOppositeEdgesFixed() throws {
@@ -289,6 +421,18 @@ final class TrackerTests: XCTestCase {
         let displays = [DisplayFrame(visibleFrame: CGRect(x: 0, y: 0, width: 1000, height: 800))]
         XCTAssertEqual(constrainedOrigin(proposed: proposed, windowSize: CGSize(width: CGFloat.nan, height: 10), displays: displays), proposed)
         XCTAssertEqual(constrainedOrigin(proposed: proposed, windowSize: CGSize(width: 0, height: 10), displays: displays), proposed)
+    }
+
+    func testConstrainedOriginHandlesTitleBarExactlyFillingDisplayHeight() {
+        let displays = [DisplayFrame(visibleFrame: CGRect(x: 0, y: 0, width: 1000, height: 24))]
+        XCTAssertEqual(
+            constrainedOrigin(
+                proposed: CGPoint(x: 500, y: 0),
+                windowSize: CGSize(width: 100, height: 24),
+                displays: displays
+            ),
+            CGPoint(x: 500, y: 0)
+        )
     }
 
     func testIdleMouseEventsDoNotQueryAccessibilityTrust() throws {

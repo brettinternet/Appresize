@@ -197,7 +197,7 @@ class Tracker {
             
             switch (currentState, nextState) {
                 case (.moving, .moving):
-                    let handled = move(delta: event.mouseDelta, pointerLocation: event.location)
+                    let handled = move(delta: event.mouseDelta)
                     if handled { lastEventTime = currentTime }
                     return handled  // Block all mouse events while moving
                 case (.resizing, .resizing):
@@ -261,10 +261,7 @@ class Tracker {
 
             // .moving -> X
             case (.moving, .moving):
-                absorbEvent = move(
-                    delta: event.mouseDelta,
-                    pointerLocation: event.location
-                )  // Block default actions while moving
+                absorbEvent = move(delta: event.mouseDelta)  // Block default actions while moving
             case (.moving, .idle),
                  (.moving, .resizing):
                 break
@@ -366,7 +363,7 @@ class Tracker {
     }
 
 
-    private func move(delta: Delta, pointerLocation: CGPoint) -> Bool {
+    private func move(delta: Delta) -> Bool {
         guard let window = trackingInfo.window else {
             log(.debug, "No window!")
             resetTrackingState()
@@ -376,8 +373,7 @@ class Tracker {
         trackingInfo.origin = constrainedOrigin(
             proposed: trackingInfo.origin + delta,
             windowSize: trackingInfo.size,
-            displays: dependencies.displays(),
-            referencePoint: pointerLocation
+            displays: dependencies.displays()
         )
 
         guard (dependencies.now() - trackingInfo.time) > Tracker.moveFilterInterval else { return true }
