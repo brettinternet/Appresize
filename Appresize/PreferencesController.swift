@@ -39,6 +39,7 @@ class PreferencesController: NSWindowController {
         super.windowDidLoad()
         updateModifierButtonStates()
         updateAccessibilityStatus()
+        alignGeneralCheckboxRows()
         updateLaunchAtLoginState()
         updateCopy()
         updateModifierConflictStatus()
@@ -216,6 +217,23 @@ extension PreferencesController: NSWindowDelegate {
         let resizeModifiers: [Modifiers<Resize>] = [.alt, .command, .control, .fn, .shift]
         for (modifier, button) in zip(resizeModifiers, resizeButtons) {
             button?.state = resize.contains(modifier) ? .on : .off
+        }
+    }
+
+    private func alignGeneralCheckboxRows() {
+        guard let contentView = window?.contentView,
+              let moveAlt,
+              let resizeFromNearestCorner else { return }
+
+        let shortcutTop = contentView.convert(moveAlt.bounds, from: moveAlt).minY
+        let offset = shortcutTop - resizeFromNearestCorner.frame.minY
+        for button in [
+            resizeFromNearestCorner,
+            showMenuIcon,
+            launchAtLogin,
+            requireDragToActivate
+        ] {
+            button?.frame.origin.y += offset
         }
     }
 

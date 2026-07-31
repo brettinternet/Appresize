@@ -89,6 +89,9 @@ final class PreferencesControllerTests: XCTestCase {
         }
         XCTAssertEqual(moveTopY, generalRowYs[0], accuracy: 0.001)
         XCTAssertEqual(resizeTopY, generalRowYs[0], accuracy: 0.001)
-        XCTAssertEqual(generalRowYs, [212, 186, 161, 136])
+        XCTAssertEqual(
+            zip(generalRowYs, generalRowYs.dropFirst()).map { $0.0 - $0.1 },
+            [26, 25, 25]
+        )
     }
 }
