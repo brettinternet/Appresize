@@ -258,7 +258,7 @@ Evidence: all 40 `TrackerTests` pass. Focused move and resize cases verify sub-p
 
 ### AR-015 — Run the event tap on a dedicated high-priority thread
 
-- Status: Open
+- Status: Done
 - Priority: P2
 - Dependencies: None
 
@@ -266,19 +266,21 @@ HyperDock creates its event tap on a dedicated `NSThread` (`threadPriority = 1.0
 
 #### Implementation tasks
 
-- [ ] T1 — Create and start the tap on a dedicated thread with elevated priority; keep `Tracker.shared` lifecycle and state mutations serialized (define and document which queue/thread owns `currentState`, `trackingInfo`, and cursor changes — today everything implicitly happens on main; align with the AR-011 locking/snapshot protocol).
-- [ ] T2 — Keep `Tracker.enable()`/`disable()` callable from the main thread; the `installEventTap == false` test path must remain main-thread-only.
-- [ ] T3 — Preserve the `tapDisabledByTimeout` re-enable behavior on the tap thread.
+- [x] T1 — Create and start the tap on a dedicated thread with elevated priority; keep `Tracker.shared` lifecycle and state mutations serialized (define and document which queue/thread owns `currentState`, `trackingInfo`, and cursor changes — today everything implicitly happens on main; align with the AR-011 locking/snapshot protocol).
+- [x] T2 — Keep `Tracker.enable()`/`disable()` callable from the main thread; the `installEventTap == false` test path must remain main-thread-only.
+- [x] T3 — Preserve the `tapDisabledByTimeout` re-enable behavior on the tap thread.
 
 #### Acceptance criteria
 
-- [ ] AC1 — The tap callback never executes on the main thread (assert via `Thread.isMainThread` in a debug check or test hook).
-- [ ] AC2 — Enabling/disabling from the status menu and Settings remains race-free; no crash on rapid toggling.
-- [ ] AC3 — Opening the Settings window or tracking a menu during an active drag does not delay window commits.
+- [x] AC1 — The tap callback never executes on the main thread (assert via `Thread.isMainThread` in a debug check or test hook).
+- [x] AC2 — Enabling/disabling from the status menu and Settings remains race-free; no crash on rapid toggling.
+- [x] AC3 — Opening the Settings window or tracking a menu during an active drag does not delay window commits.
 
 #### Definition of Done
 
-- [ ] DOD1 — Threading ownership is documented in `Tracker.swift`; existing tests pass unchanged.
+- [x] DOD1 — Threading ownership is documented in `Tracker.swift`; existing tests pass unchanged.
+
+Evidence: all 75 unit tests pass unchanged and the Release build succeeds. Live Debug-build checks confirmed rapid Enabled toggling, responsive move/resize while opening Settings and tracking the status menu, and no callback-on-main assertion failure.
 
 ### AR-016 — Repost a synthetic mouseMoved when consuming drag events
 
