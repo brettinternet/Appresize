@@ -254,7 +254,7 @@ HyperDock converts mouse deltas double→float→double inside its move/resize h
 
 - [x] DOD1 — A `TrackerTests` case feeds sub-pixel deltas and asserts both the rounding and the no-drift accumulation.
 
-Evidence: all 39 `TrackerTests` pass. Focused move and resize cases verify sub-pixel noise produces no write, accumulated motion crosses the rounding threshold without drift, committed origins and sizes are integral, and moving a fractionally sized window does not resize it.
+Evidence: all 40 `TrackerTests` pass. Focused move and resize cases verify sub-pixel noise produces no write, accumulated motion crosses the rounding threshold without drift, committed origins and sizes are integral, and moving a fractionally sized window does not resize it.
 
 ### AR-015 — Run the event tap on a dedicated high-priority thread
 
