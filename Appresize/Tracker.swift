@@ -419,7 +419,7 @@ class Tracker {
         }
 
         let startTime = dependencies.now()
-        let initialRect = CGRect(origin: origin, size: size)
+        let initialRect = roundedTargetRect(origin: origin, size: size)
         let generation = withTrackingLock {
             trackingInfo.generation &+= 1
             let commitState = CommitGenerationState(
@@ -472,6 +472,15 @@ class Tracker {
         }
     }
 
+    private func roundedTargetRect(origin: CGPoint, size: CGSize) -> CGRect {
+        CGRect(
+            x: origin.x.rounded(),
+            y: origin.y.rounded(),
+            width: size.width.rounded(),
+            height: size.height.rounded()
+        )
+    }
+
     private func move(to location: CGPoint) -> Bool {
         let hasWindow = withTrackingLock { trackingInfo.window != nil }
         guard hasWindow else {
@@ -488,7 +497,7 @@ class Tracker {
                 windowSize: trackingInfo.size,
                 displays: dependencies.displays()
             )
-            trackingInfo.targetRect = CGRect(
+            trackingInfo.targetRect = roundedTargetRect(
                 origin: trackingInfo.origin,
                 size: trackingInfo.size
             )
@@ -534,7 +543,7 @@ class Tracker {
                 }
             }
 
-            trackingInfo.targetRect = CGRect(
+            trackingInfo.targetRect = roundedTargetRect(
                 origin: trackingInfo.origin,
                 size: trackingInfo.size
             )

@@ -197,6 +197,43 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(window.size.width, 106)
     }
 
+    func testSubpixelResizeRoundsTargetWithoutLosingAccumulation() throws {
+        defaults.set(true, forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window)
+
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate), type: .mouseMoved))
+
+        for offset in [0.2, 0.4] {
+            XCTAssertTrue(tracker.handleEvent(
+                event(flags: .maskAlternate, location: CGPoint(x: offset, y: offset)),
+                type: .mouseMoved
+            ))
+            fireTimer()
+        }
+        XCTAssertEqual(window.originWriteCount, 0)
+        XCTAssertEqual(window.sizeWriteCount, 0)
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 0.6, y: 0.6)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+
+        XCTAssertEqual(window.origin, CGPoint(x: 1, y: 1))
+        XCTAssertEqual(window.size, CGSize(width: 99, height: 99))
+        XCTAssertEqual(window.originWriteCount, 1)
+        XCTAssertEqual(window.sizeWriteCount, 1)
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 0.8, y: 0.8)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        XCTAssertEqual(window.originWriteCount, 1)
+        XCTAssertEqual(window.sizeWriteCount, 1)
+    }
+
     func testMoveCursorIsRestoredWhenModifiersAreReleased() throws {
         let window = FakeWindow()
         var selected: [Tracker.CursorKind] = []
@@ -307,6 +344,7 @@ final class TrackerTests: XCTestCase {
 
     func testPinnedPointerIgnoresRawDeltaThenFollowsAbsoluteLocation() throws {
         let window = FakeWindow()
+        window.size = CGSize(width: 100.25, height: 100.25)
         let tracker = try makeTracker(window: window)
         let location = CGPoint(x: 100, y: 100)
 
@@ -323,13 +361,23 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(window.origin, .zero)
 
         now = 2
-        let movedLocation = CGPoint(x: 100.5, y: 101.25)
+        let subpixelNoise = CGPoint(x: 100.4, y: 100.4)
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, dx: 0, dy: 0, location: subpixelNoise),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        XCTAssertEqual(window.origin, .zero)
+        XCTAssertEqual(window.originWriteCount, 0)
+
+        let movedLocation = CGPoint(x: 100.6, y: 101.25)
         XCTAssertTrue(tracker.handleEvent(
             event(flags: .maskControl, dx: 0, dy: 0, location: movedLocation),
             type: .mouseMoved
         ))
         fireTimer()
-        XCTAssertEqual(window.origin, CGPoint(x: 0.5, y: 1.25))
+        XCTAssertEqual(window.origin, CGPoint(x: 1, y: 1))
+        XCTAssertEqual(window.sizeWriteCount, 0)
     }
 
     func testMoveAnchorAccumulatesThroughUnappliedOriginWritesAndReverses() throws {

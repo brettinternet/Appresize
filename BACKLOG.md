@@ -234,7 +234,7 @@ Evidence: deterministic tests cover cursor restoration, display-coordinate conve
 
 ### AR-014 — Round mouse deltas to float precision
 
-- Status: Open
+- Status: Done
 - Priority: P2
 - Dependencies: None
 
@@ -242,17 +242,19 @@ HyperDock converts mouse deltas double→float→double inside its move/resize h
 
 #### Implementation tasks
 
-- [ ] T1 — Quantize the computed target origin and size to integral points where the target rect is stored (`Tracker.move(to:)` / `resize(delta:)`), keeping deltas themselves at full precision. Quantizing the accumulated target — not each delta — means slow sub-pixel motion still accumulates and steps by 1 px when it crosses a boundary. Note: a double→float→double round-trip (HyperDock's mechanism) drops precision but does NOT quantize (100.1 stays fractional); it is not an acceptable substitute.
-- [ ] T2 — Confirm rounding composes with the existing `Delta` accumulation and display-constraint math (no drift from repeated rounding).
+- [x] T1 — Quantize the computed target origin and size to integral points where the target rect is stored (`Tracker.move(to:)` / `resize(delta:)`), keeping deltas themselves at full precision. Quantizing the accumulated target — not each delta — means slow sub-pixel motion still accumulates and steps by 1 px when it crosses a boundary. Note: a double→float→double round-trip (HyperDock's mechanism) drops precision but does NOT quantize (100.1 stays fractional); it is not an acceptable substitute.
+- [x] T2 — Confirm rounding composes with the existing `Delta` accumulation and display-constraint math (no drift from repeated rounding).
 
 #### Acceptance criteria
 
-- [ ] AC1 — Committed AX writes carry integral origins and sizes (rounded when the target rect is computed), and sub-pixel mouse noise alone never triggers an AX write.
-- [ ] AC2 — Slow, small movements still accumulate and apply (quantization must not swallow sub-threshold motion over time).
+- [x] AC1 — Committed AX writes carry integral origins and sizes (rounded when the target rect is computed), and sub-pixel mouse noise alone never triggers an AX write.
+- [x] AC2 — Slow, small movements still accumulate and apply (quantization must not swallow sub-threshold motion over time).
 
 #### Definition of Done
 
-- [ ] DOD1 — A `TrackerTests` case feeds sub-pixel deltas and asserts both the rounding and the no-drift accumulation.
+- [x] DOD1 — A `TrackerTests` case feeds sub-pixel deltas and asserts both the rounding and the no-drift accumulation.
+
+Evidence: all 39 `TrackerTests` pass. Focused move and resize cases verify sub-pixel noise produces no write, accumulated motion crosses the rounding threshold without drift, committed origins and sizes are integral, and moving a fractionally sized window does not resize it.
 
 ### AR-015 — Run the event tap on a dedicated high-priority thread
 
