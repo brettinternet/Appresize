@@ -13,10 +13,9 @@ class AppStateMachineTests: XCTestCase {
 
 class AppDelegateLaunchTests: XCTestCase {
 
-    func test_manual_first_launch_presents_settings_but_login_launch_stays_silent() {
-        XCTAssertTrue(AppDelegate.shouldPresentFirstLaunchSettings(isFirstLaunch: true, launchedAsLoginItem: false))
-        XCTAssertFalse(AppDelegate.shouldPresentFirstLaunchSettings(isFirstLaunch: true, launchedAsLoginItem: true))
-        XCTAssertFalse(AppDelegate.shouldPresentFirstLaunchSettings(isFirstLaunch: false, launchedAsLoginItem: false))
+    func test_manual_launch_presents_settings_but_login_launch_stays_silent() {
+        XCTAssertTrue(AppDelegate.shouldPresentSettings(launchedAsLoginItem: false))
+        XCTAssertFalse(AppDelegate.shouldPresentSettings(launchedAsLoginItem: true))
     }
 
     func test_login_launch_suppresses_permission_alerts() {

@@ -25,8 +25,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let accessibilityValue: String
     }
 
-    static func shouldPresentFirstLaunchSettings(isFirstLaunch: Bool, launchedAsLoginItem: Bool) -> Bool {
-        isFirstLaunch && !launchedAsLoginItem
+    static func shouldPresentSettings(launchedAsLoginItem: Bool) -> Bool {
+        !launchedAsLoginItem
     }
 
     static func shouldPresentPermissionAlert(launchedAsLoginItem: Bool) -> Bool {
@@ -126,7 +126,7 @@ extension AppDelegate {
             stateMachine.suppressActivationAlerts = launchedAsLoginItem
         }
 
-        if Self.shouldPresentFirstLaunchSettings(isFirstLaunch: isFirstLaunch, launchedAsLoginItem: launchedAsLoginItem) {
+        if Self.shouldPresentSettings(launchedAsLoginItem: launchedAsLoginItem) {
             NSApp.activate(ignoringOtherApps: true)
             preferencesController.showWindow(nil)
         }
