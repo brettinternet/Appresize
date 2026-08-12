@@ -666,6 +666,30 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(window.originWriteCount, 1)
     }
 
+    func testQueuedResizeCommitsDropStaleTargets() throws {
+        let window = FakeWindow()
+        let commits = ManualCommitExecutor()
+        let tracker = try makeTracker(window: window, enqueueCommit: commits.enqueue)
+
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 10, y: 10)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 20, y: 20)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        XCTAssertEqual(commits.count, 2)
+
+        commits.runAll()
+
+        XCTAssertEqual(window.size, CGSize(width: 120, height: 120))
+        XCTAssertEqual(window.sizeWriteCount, 1)
+    }
+
     func testFinalCommitUsesModifierReleaseLocationWithoutTimerTick() throws {
         let window = FakeWindow()
         let tracker = try makeTracker(window: window)

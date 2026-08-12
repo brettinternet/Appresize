@@ -616,6 +616,7 @@ class Tracker {
             if !unconditional {
                 guard !snapshot.commitState.cancelled,
                       trackingInfo.commitState === snapshot.commitState,
+                      trackingInfo.targetRect == snapshot.rect,
                       snapshot.rect != snapshot.commitState.lastCommittedRect else {
                     return nil
                 }
