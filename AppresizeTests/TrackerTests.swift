@@ -134,7 +134,32 @@ final class TrackerTests: XCTestCase {
         wait(for: [resetCompleted], timeout: 1)
     }
 
-    func testResizeReadsBackClampedSizeBeforeReversing() throws {
+    func testResizeCommitDoesNotReadBackPositionOrSize() throws {
+        defaults.set(true, forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
+        let window = FakeWindow()
+        window.origin = CGPoint(x: 100, y: 100)
+        let tracker = try makeTracker(window: window)
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 100, y: 100)),
+            type: .mouseMoved
+        ))
+        let originReadsAtStart = window.originReadCount
+        let sizeReadsAtStart = window.sizeReadCount
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 90, y: 90)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+
+        XCTAssertEqual(window.originWriteCount, 1)
+        XCTAssertEqual(window.sizeWriteCount, 1)
+        XCTAssertEqual(window.originReadCount, originReadsAtStart)
+        XCTAssertEqual(window.sizeReadCount, sizeReadsAtStart)
+    }
+
+    func testResizeTrustsRequestedSizeWhileNativeClampStaysPinned() throws {
         let window = FakeWindow()
         window.minimumWidth = 50
         let tracker = try makeTracker(window: window)
@@ -144,8 +169,14 @@ final class TrackerTests: XCTestCase {
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -90, location: CGPoint(x: -90, y: 0)), type: .mouseMoved))
         fireTimer()
         XCTAssertEqual(window.size.width, 50)
+
         now = 2
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 10, location: CGPoint(x: -80, y: 0)), type: .mouseMoved))
+        fireTimer()
+        XCTAssertEqual(window.size.width, 50)
+
+        now = 3
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 40, location: CGPoint(x: -40, y: 0)), type: .mouseMoved))
         fireTimer()
         XCTAssertEqual(window.size.width, 60)
     }
@@ -198,7 +229,7 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(cursorSets, 2)
     }
 
-    func testResizeOvershootClampsToNativeMinimumAndReversesImmediately() throws {
+    func testResizeOvershootRemainsAtNativeMinimumUntilRequestedSizeRecovers() throws {
         let window = FakeWindow()
         window.minimumWidth = 50
         var cursorSets = 0
@@ -212,8 +243,20 @@ final class TrackerTests: XCTestCase {
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -150, location: CGPoint(x: -150, y: 0)), type: .mouseMoved))
         fireTimer()
         XCTAssertEqual(window.size.width, 50)
+
         now = 2
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 10, location: CGPoint(x: -140, y: 0)), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -10, location: CGPoint(x: -160, y: 0)), type: .mouseMoved))
+        fireTimer()
+        XCTAssertEqual(window.size.width, 50)
+        XCTAssertEqual(window.sizeWriteCount, 1)
+
+        now = 3
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 20, location: CGPoint(x: -140, y: 0)), type: .mouseMoved))
+        fireTimer()
+        XCTAssertEqual(window.size.width, 50)
+
+        now = 4
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 39, location: CGPoint(x: -101, y: 0)), type: .mouseMoved))
         fireTimer()
         XCTAssertEqual(window.size.width, 60)
         XCTAssertEqual(cursorSets, 1)
@@ -456,7 +499,7 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(window.origin, CGPoint(x: 920, y: 0))
     }
 
-    func testClampedTopLeftResizeKeepsOppositeEdgesFixed() throws {
+    func testClampedTopLeftResizeStopsAtRequestedMinimumWithoutReadBack() throws {
         defaults.set(true, forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
         let window = FakeWindow()
         window.origin = CGPoint(x: 100, y: 100)
@@ -470,15 +513,25 @@ final class TrackerTests: XCTestCase {
         ))
         now = 1
         XCTAssertTrue(tracker.handleEvent(
-            event(flags: .maskAlternate, dx: 90, dy: 90, location: CGPoint(x: 190, y: 190)),
+            event(flags: .maskAlternate, location: CGPoint(x: 250, y: 250)),
             type: .mouseMoved
         ))
-
         fireTimer()
         XCTAssertEqual(window.size, CGSize(width: 50, height: 40))
-        XCTAssertEqual(window.origin, CGPoint(x: 150, y: 160))
-        XCTAssertEqual(window.origin.x + window.size.width, 200)
-        XCTAssertEqual(window.origin.y + window.size.height, 200)
+        XCTAssertEqual(window.origin, CGPoint(x: 199, y: 199))
+        XCTAssertEqual(window.sizeWriteCount, 1)
+        XCTAssertEqual(window.originWriteCount, 1)
+
+        now = 2
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 260, y: 260)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        XCTAssertEqual(window.size, CGSize(width: 50, height: 40))
+        XCTAssertEqual(window.origin, CGPoint(x: 199, y: 199))
+        XCTAssertEqual(window.sizeWriteCount, 1)
+        XCTAssertEqual(window.originWriteCount, 1)
     }
 
     func testFailedResizeWriteDoesNotMoveOrigin() throws {
@@ -797,6 +850,8 @@ private final class FakeWindow {
     private var storedSize = CGSize(width: 100, height: 100)
     private var storedOriginWriteCount = 0
     private var storedSizeWriteCount = 0
+    private var storedOriginReadCount = 0
+    private var storedSizeReadCount = 0
 
     var origin: CGPoint {
         get { withLock { storedOrigin } }
@@ -808,6 +863,8 @@ private final class FakeWindow {
     }
     var originWriteCount: Int { withLock { storedOriginWriteCount } }
     var sizeWriteCount: Int { withLock { storedSizeWriteCount } }
+    var originReadCount: Int { withLock { storedOriginReadCount } }
+    var sizeReadCount: Int { withLock { storedSizeReadCount } }
 
     var canSetOrigin = true
     var canSetSize = true
@@ -818,13 +875,27 @@ private final class FakeWindow {
     var minimumHeight: CGFloat = 1
 
     lazy var trackingWindow = TrackingWindow(
-        origin: { [unowned self] in origin },
-        size: { [unowned self] in size },
+        origin: { [unowned self] in readOrigin() },
+        size: { [unowned self] in readSize() },
         canSetOrigin: { [unowned self] in canSetOrigin },
         canSetSize: { [unowned self] in canSetSize },
         setOrigin: { [unowned self] value in setOrigin(value) },
         setSize: { [unowned self] value in setSize(value) }
     )
+
+    private func readOrigin() -> CGPoint {
+        withLock {
+            storedOriginReadCount += 1
+            return storedOrigin
+        }
+    }
+
+    private func readSize() -> CGSize {
+        withLock {
+            storedSizeReadCount += 1
+            return storedSize
+        }
+    }
 
     private func setOrigin(_ value: CGPoint) -> Bool {
         withLock {

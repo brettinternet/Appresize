@@ -632,72 +632,38 @@ class Tracker {
         guard let lastCommittedRect else { return }
         dependencies.commitApplyGate()
 
-        let appliedRect = apply(
-            snapshot,
-            lastCommittedRect: lastCommittedRect
-        )
-        guard let appliedRect else {
+        guard apply(snapshot, lastCommittedRect: lastCommittedRect) else {
             handleCommitFailure(for: snapshot.commitState)
             return
         }
 
         withTrackingLock {
-            snapshot.commitState.lastCommittedRect = appliedRect
+            snapshot.commitState.lastCommittedRect = snapshot.rect
             snapshot.commitState.commitClaimed = false
             guard trackingInfo.commitState === snapshot.commitState else { return }
-            trackingInfo.lastCommittedRect = appliedRect
-            if trackingInfo.targetRect == snapshot.rect {
-                trackingInfo.targetRect = appliedRect
-                trackingInfo.origin = appliedRect.origin
-                trackingInfo.size = appliedRect.size
-            }
+            trackingInfo.lastCommittedRect = snapshot.rect
         }
     }
 
     private func apply(
         _ snapshot: CommitSnapshot,
         lastCommittedRect: CGRect
-    ) -> CGRect? {
+    ) -> Bool {
         let sizeChanged = snapshot.rect.size != lastCommittedRect.size
         let originChanged = snapshot.rect.origin != lastCommittedRect.origin
 
-        var appliedSize = snapshot.rect.size
-        if sizeChanged {
-            guard snapshot.window.setSize(snapshot.rect.size),
-                  let readSize = snapshot.window.size() else { return nil }
-            appliedSize = readSize
-        }
-
-        let appliedRequestedOrigin: CGPoint
-        switch snapshot.corner {
-        case .topLeft:
-            appliedRequestedOrigin = CGPoint(
-                x: snapshot.rect.origin.x + snapshot.rect.width - appliedSize.width,
-                y: snapshot.rect.origin.y + snapshot.rect.height - appliedSize.height
-            )
-        case .topRight:
-            appliedRequestedOrigin = CGPoint(
-                x: snapshot.rect.origin.x,
-                y: snapshot.rect.origin.y + snapshot.rect.height - appliedSize.height
-            )
-        case .bottomRight:
-            appliedRequestedOrigin = snapshot.rect.origin
-        case .bottomLeft:
-            appliedRequestedOrigin = CGPoint(
-                x: snapshot.rect.origin.x + snapshot.rect.width - appliedSize.width,
-                y: snapshot.rect.origin.y
-            )
+        if sizeChanged && !snapshot.window.setSize(snapshot.rect.size) {
+            return false
         }
 
         let shouldWriteOrigin = (snapshot.state == .resizing
             && snapshot.corner != .bottomRight
             && (originChanged || sizeChanged))
             || (!sizeChanged && originChanged)
-        if shouldWriteOrigin && !snapshot.window.setOrigin(appliedRequestedOrigin) {
-            return nil
+        if shouldWriteOrigin && !snapshot.window.setOrigin(snapshot.rect.origin) {
+            return false
         }
-        guard let appliedOrigin = snapshot.window.origin() else { return nil }
-        return CGRect(origin: appliedOrigin, size: appliedSize)
+        return true
     }
 
     private func handleCommitFailure(for commitState: CommitGenerationState) {
