@@ -26,12 +26,23 @@ The releases are [built and published by a GitHub Action](https://github.com/bre
 Appresize requires macOS 15.2 or newer. Xcode is required to build the app. Run the release task from `Taskfile.dist.yaml`.
 
 ```sh
-task build:release # build only
-
-task copy:release # build and copy the app to /Applications
+task build:release # build, ad-hoc sign, and verify the universal app
+task copy:release  # build and copy the app to /Applications
+task package:release RELEASE_TAG=v0.0.9 # create the DMG and checksum
 ```
 
 Open the app `build/Build/Products/Release/Appresize.app`.
+
+### Publish
+
+Update `MARKETING_VERSION` in the Xcode project, commit it, then push the matching tag:
+
+```sh
+git tag v0.0.9
+git push origin v0.0.9
+```
+
+Tags matching `vMAJOR.MINOR.PATCH` (optionally `-alpha.N`, `-beta.N`, or `-rc.N`) run tests, build the universal app, create a DMG and checksum, and publish a GitHub release. Prerelease tags create prerelease GitHub releases.
 
 ### Unsigned Release
 

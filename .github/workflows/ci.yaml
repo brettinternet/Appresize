@@ -1,78 +1,107 @@
 name: CI
 
 on:
-  push:
-    branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
+  push:
+    branches: [main]
+    tags:
+      - "v*"
 
 permissions:
   contents: read
 
 jobs:
-  ci:
+  test:
+    name: Build and test
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: macos-15
-    if: "!contains(github.event.head_commit.message, 'skipci')"
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check out source
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
-
       - name: Show Xcode version
         run: xcodebuild -version
-
+      - name: Check release version policy
+        run: ./scripts/test-release-version.sh
       - name: Build tests
         run: |
           xcodebuild build-for-testing \
-                     -project Appresize.xcodeproj \
-                     -scheme Appresize \
-                     -configuration Debug \
-                     -derivedDataPath build \
-                     -destination 'platform=macOS'
+            -project Appresize.xcodeproj \
+            -scheme Appresize \
+            -configuration Debug \
+            -derivedDataPath build \
+            -destination 'platform=macOS'
           /usr/bin/xcrun swift ./scripts/sign-local-app.swift \
             build/Build/Products/Debug/Appresize.app
-      
-      - name: Run tests (with timeout)
+      - name: Run tests
         timeout-minutes: 5
         run: |
           xcodebuild test-without-building \
-                     -project Appresize.xcodeproj \
-                     -scheme Appresize \
-                     -configuration Debug \
-                     -derivedDataPath build \
-                     -destination 'platform=macOS' \
-                     -only-testing:AppresizeTests
+            -project Appresize.xcodeproj \
+            -scheme Appresize \
+            -configuration Debug \
+            -derivedDataPath build \
+            -destination 'platform=macOS' \
+            -only-testing:AppresizeTests
+      - name: Build and verify release app
+        run: ./scripts/build-release.sh
 
-      - name: Build app (Release)
-        run: |
-          xcodebuild -project Appresize.xcodeproj \
-                     -scheme Appresize \
-                     -configuration Release \
-                     -derivedDataPath build \
-                     -destination 'generic/platform=macOS' \
-                     build
-          /usr/bin/xcrun swift ./scripts/sign-local-app.swift \
-            build/Build/Products/Release/Appresize.app
-
-      - name: Verify app bundle
-        run: |
-          APP_PATH="build/Build/Products/Release/Appresize.app"
-          BINARY_PATH="$APP_PATH/Contents/MacOS/Appresize"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "App bundle not found"
-            exit 1
-          fi
-          ARCHS="$(lipo -archs "$BINARY_PATH")"
-          [[ "$ARCHS" == *arm64* && "$ARCHS" == *x86_64* ]]
-          codesign --verify --deep --strict "$APP_PATH"
-          codesign -d --verbose=4 "$APP_PATH" 2>&1 | grep 'flags=.*runtime'
-
-      - name: Upload build artifacts
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+  release:
+    name: Test and publish universal macOS release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
         with:
-          name: appresize-release-build
-          path: build/Build/Products/Release/Appresize.app
-          retention-days: 7
+          persist-credentials: false
+      - name: Check release version policy
+        run: ./scripts/test-release-version.sh
+      - name: Build tests
+        run: |
+          xcodebuild build-for-testing \
+            -project Appresize.xcodeproj \
+            -scheme Appresize \
+            -configuration Debug \
+            -derivedDataPath build \
+            -destination 'platform=macOS'
+          /usr/bin/xcrun swift ./scripts/sign-local-app.swift \
+            build/Build/Products/Debug/Appresize.app
+      - name: Run tests
+        timeout-minutes: 5
+        run: |
+          xcodebuild test-without-building \
+            -project Appresize.xcodeproj \
+            -scheme Appresize \
+            -configuration Debug \
+            -derivedDataPath build \
+            -destination 'platform=macOS' \
+            -only-testing:AppresizeTests
+      - name: Package release
+        run: ./scripts/package-release.sh "$GITHUB_REF_NAME"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: |
+            Download `Appresize-…-macos-universal.dmg` and verify its matching SHA-256 checksum.
+
+            The app is universal arm64/x86_64 and ad-hoc signed, not Developer ID signed or notarized. macOS may require Privacy & Security → Open Anyway.
+        run: |
+          source scripts/release-version.sh
+          release_version_parse "$GITHUB_REF_NAME"
+          release_flags=()
+          if [[ "$RELEASE_IS_PRERELEASE" == 1 ]]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/Appresize-${GITHUB_REF_NAME}-macos-universal.dmg#Appresize universal macOS DMG" \
+            "dist/Appresize-${GITHUB_REF_NAME}-macos-universal.dmg.sha256#Appresize DMG SHA-256" \
+            --title "$GITHUB_REF_NAME" \
+            --verify-tag \
+            "${release_flags[@]}" \
+            --notes "$RELEASE_NOTES" \
+            --generate-notes

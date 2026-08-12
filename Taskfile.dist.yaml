@@ -11,6 +11,7 @@ vars:
   CONFIGURATION_DEBUG: Debug
   CONFIGURATION_RELEASE: Release
   DESTINATION: "platform=macOS"
+  RELEASE_APP_PATH: build/Build/Products/Release/Appresize.app
 
 tasks:
   default:
@@ -22,7 +23,7 @@ tasks:
   clean:
     desc: Clean build artifacts
     cmds:
-      - /bin/rm -rf "{{.BUILD_DIR}}"
+      - /bin/test ! -e "{{.BUILD_DIR}}" || /usr/bin/trash "{{.BUILD_DIR}}"
       - xcodebuild clean -project "{{.PROJECT}}" -scheme "{{.SCHEME}}"
 
   build:
@@ -31,9 +32,16 @@ tasks:
       - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" build
 
   build:release:
-    desc: Build the app (Release)
+    desc: Build, sign, and verify the universal release app
     cmds:
-      - xcodebuild -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "generic/platform=macOS" build
+      - ./scripts/build-release.sh
+
+  package:release:
+    desc: Build a release DMG and SHA-256 checksum
+    requires:
+      vars: [RELEASE_TAG]
+    cmds:
+      - ./scripts/package-release.sh "{{.RELEASE_TAG}}"
 
   test:build:
     desc: Build tests
@@ -74,7 +82,7 @@ tasks:
     desc: Copy the built app release to the Applications folder
     deps: ["build:release"]
     cmds:
-      - /usr/bin/xcrun swift ./scripts/install-release.swift "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app" /Applications/Appresize.app
+      - /usr/bin/xcrun swift ./scripts/install-release.swift "{{.RELEASE_APP_PATH}}" /Applications/Appresize.app
 
   open:
     desc: Run the built app (Debug)
@@ -84,7 +92,7 @@ tasks:
   open:release:
     desc: Run the built app (Release)
     cmds:
-      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_RELEASE}}/Appresize.app"
+      - open "{{.RELEASE_APP_PATH}}"
 
   archive:
     desc: Create an archive for distribution

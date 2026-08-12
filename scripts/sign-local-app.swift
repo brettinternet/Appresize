@@ -6,6 +6,7 @@ enum SignError: LocalizedError {
     case usage
     case invalidApp(String)
     case missingBundleIdentifier
+    case missingBundleExecutable
     case invalidBundleIdentifier(String)
     case commandFailed(String)
 
@@ -17,6 +18,8 @@ enum SignError: LocalizedError {
             return "app bundle not found: \(path)"
         case .missingBundleIdentifier:
             return "app bundle has no CFBundleIdentifier"
+        case .missingBundleExecutable:
+            return "app bundle has no CFBundleExecutable"
         case .invalidBundleIdentifier(let identifier):
             return "app bundle has an invalid CFBundleIdentifier: \(identifier)"
         case .commandFailed(let message):
@@ -75,6 +78,10 @@ func sign(appPath: String) throws {
           !bundleIdentifier.isEmpty else {
         throw SignError.missingBundleIdentifier
     }
+    guard let executable = info["CFBundleExecutable"] as? String,
+          !executable.isEmpty else {
+        throw SignError.missingBundleExecutable
+    }
 
     let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-"))
     guard bundleIdentifier.unicodeScalars.allSatisfy(allowed.contains) else {
@@ -85,12 +92,28 @@ func sign(appPath: String) throws {
         return
     }
     let requirement = "=designated => identifier \"\(bundleIdentifier)\""
+    let debugLibrary = app
+        .appendingPathComponent("Contents/MacOS")
+        .appendingPathComponent("\(executable).debug.dylib")
+    let signingOptions = FileManager.default.fileExists(atPath: debugLibrary.path)
+        ? []
+        : ["--options", "runtime"]
 
     try run([
         "--force",
-        "--sign", "-",
+        "--deep",
+        "--sign", "-"
+    ] + signingOptions + [
+        "--preserve-metadata=entitlements",
+        app.path
+    ])
+
+    try run([
+        "--force",
+        "--sign", "-"
+    ] + signingOptions + [
         "--requirements", requirement,
-        "--preserve-metadata=entitlements,flags",
+        "--preserve-metadata=entitlements",
         app.path
     ])
     try run(["--verify", "--deep", "--strict", app.path])
