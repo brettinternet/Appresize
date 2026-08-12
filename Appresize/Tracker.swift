@@ -65,6 +65,7 @@ class Tracker {
         var enqueueCommit: (@escaping () -> Void) -> Void
         var commitGate: () -> Void = {}
         var commitApplyGate: () -> Void = {}
+        var postMouseMoved: (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }
         var installEventTap: Bool
 
         static var live: Self {
@@ -152,6 +153,7 @@ class Tracker {
     private var priorCursor: NSCursor?
     private var activeCursor: CursorKind?
     private static let maxEventAbsorptionTime: CFAbsoluteTime = 5.0  // Max 5 seconds of continuous absorption
+    private static let syntheticMouseMovedMarker: Int64 = 0x4152_4D4F_5645
 
 
     init(dependencies: Dependencies = .live) throws {
@@ -201,6 +203,11 @@ class Tracker {
             return false
         }
 
+        if type == .mouseMoved,
+           event.getIntegerValueField(.eventSourceUserData) == Self.syntheticMouseMovedMarker {
+            return false
+        }
+
         // Check if we should respond to this event type based on drag-only setting
         let isDragEvent = type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged
         let isMoveEvent = type == .mouseMoved
@@ -208,6 +215,12 @@ class Tracker {
                                 type == .rightMouseDown || type == .rightMouseUp ||
                                 type == .otherMouseDown || type == .otherMouseUp
         let isMouseUp = type == .leftMouseUp || type == .rightMouseUp || type == .otherMouseUp
+
+        func absorbActiveEvent(_ handled: Bool) -> Bool {
+            guard handled, isDragEvent else { return handled }
+            postSyntheticMouseMoved(for: event)
+            return true
+        }
 
         // Drag-only mode must not consume button transitions. Once a drag has
         // actually started, use its button to identify the matching mouse-up
@@ -253,29 +266,29 @@ class Tracker {
                 case (.moving, .moving):
                     let handled = move(to: event.location)
                     if handled { lastEventTime = currentTime }
-                    return handled  // Block all mouse events while moving
+                    return absorbActiveEvent(handled)  // Block all mouse events while moving
                 case (.resizing, .resizing):
                     let handled = resize(delta: trackingDelta(at: event.location))
                     if handled { lastEventTime = currentTime }
-                    return handled  // Block all mouse events while resizing
+                    return absorbActiveEvent(handled)  // Block all mouse events while resizing
                 case (.moving, .idle), (.resizing, .idle):
                     guard updateTargetForRelease(at: event.location) else { return false }
                     resetTrackingState()
-                    return isMouseButtonEvent ? false : true  // Pass button transitions through
+                    return absorbActiveEvent(isMouseButtonEvent ? false : true)  // Pass button transitions through
                 case (.moving, .resizing):
                     guard startTracking(at: event.location, state: nextState) else {
                         resetTrackingState()
                         return false
                     }
                     currentState = nextState
-                    return true  // Block transition events
+                    return absorbActiveEvent(true)  // Block transition events
                 case (.resizing, .moving):
                     guard startTracking(at: event.location, state: nextState) else {
                         resetTrackingState()
                         return false
                     }
                     currentState = nextState
-                    return true  // Block transition events
+                    return absorbActiveEvent(true)  // Block transition events
                 default:
                     break
             }
@@ -339,7 +352,22 @@ class Tracker {
 
         currentState = nextState
 
-        return absorbEvent
+        return absorbActiveEvent(absorbEvent)
+    }
+
+    private func postSyntheticMouseMoved(for event: CGEvent) {
+        guard let mouseMoved = CGEvent(
+            mouseEventSource: nil,
+            mouseType: .mouseMoved,
+            mouseCursorPosition: event.location,
+            mouseButton: .left
+        ) else { return }
+        mouseMoved.flags = event.flags
+        mouseMoved.setIntegerValueField(
+            .eventSourceUserData,
+            value: Self.syntheticMouseMovedMarker
+        )
+        dependencies.postMouseMoved(mouseMoved)
     }
 
 
