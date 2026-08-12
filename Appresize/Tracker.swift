@@ -321,13 +321,16 @@ class Tracker {
 
         // Check if we should respond to this event type based on drag-only setting
         let isDragEvent = type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged
+        let isFlagsChangedEvent = type == .flagsChanged
         let isMoveEvent = type == .mouseMoved
+        let isStateReevaluationEvent = isMoveEvent || isFlagsChangedEvent
         let isMouseButtonEvent = type == .leftMouseDown || type == .leftMouseUp || 
                                 type == .rightMouseDown || type == .rightMouseUp ||
                                 type == .otherMouseDown || type == .otherMouseUp
         let isMouseUp = type == .leftMouseUp || type == .rightMouseUp || type == .otherMouseUp
 
         func absorbActiveEvent(_ handled: Bool) -> Bool {
+            guard !isFlagsChangedEvent else { return false }
             guard handled, isDragEvent else { return handled }
             postSyntheticMouseMoved(for: event)
             return true
@@ -349,9 +352,8 @@ class Tracker {
 
         if moveModifiers.isEmpty && resizeModifiers.isEmpty { return false }
 
-        // If we're currently in an active state (moving or resizing), absorb all mouse events
-        // to prevent default actions like text selection
-        if currentState != .idle && (isDragEvent || isMoveEvent || isMouseButtonEvent) {
+        // Re-evaluate active state for mouse and modifier events, but only mouse events may be absorbed.
+        if currentState != .idle && (isDragEvent || isStateReevaluationEvent || isMouseButtonEvent) {
             guard dependencies.trusted() else {
                 log(.error, "⚠️ Accessibility permissions lost during event handling - aborting")
                 resetTrackingState()
@@ -377,29 +379,29 @@ class Tracker {
                 case (.moving, .moving):
                     let handled = move(to: event.location)
                     if handled { lastEventTime = currentTime }
-                    return absorbActiveEvent(handled)  // Block all mouse events while moving
+                    return absorbActiveEvent(handled)
                 case (.resizing, .resizing):
                     let handled = resize(delta: trackingDelta(at: event.location))
                     if handled { lastEventTime = currentTime }
-                    return absorbActiveEvent(handled)  // Block all mouse events while resizing
+                    return absorbActiveEvent(handled)
                 case (.moving, .idle), (.resizing, .idle):
                     guard updateTargetForRelease(at: event.location) else { return false }
                     resetTrackingState()
-                    return absorbActiveEvent(isMouseButtonEvent ? false : true)  // Pass button transitions through
+                    return absorbActiveEvent(isMouseButtonEvent ? false : true)
                 case (.moving, .resizing):
                     guard startTracking(at: event.location, state: nextState) else {
                         resetTrackingState()
                         return false
                     }
                     currentState = nextState
-                    return absorbActiveEvent(true)  // Block transition events
+                    return absorbActiveEvent(true)
                 case (.resizing, .moving):
                     guard startTracking(at: event.location, state: nextState) else {
                         resetTrackingState()
                         return false
                     }
                     currentState = nextState
-                    return absorbActiveEvent(true)  // Block transition events
+                    return absorbActiveEvent(true)
                 default:
                     break
             }
@@ -408,9 +410,8 @@ class Tracker {
         if requireDragToActivate && !isDragEvent {
             return false  // Only respond to drag events when drag-only mode is enabled
         }
-
-        if !requireDragToActivate && !isMoveEvent && !isDragEvent {
-            return false  // In normal mode, respond to both move and drag events
+        if !requireDragToActivate && !isStateReevaluationEvent && !isDragEvent {
+            return false  // In normal mode, respond to mouse movement, drags, and modifier changes
         }
 
         var absorbEvent = false
@@ -891,6 +892,7 @@ private func enableTap(userInfo: UnsafeMutableRawPointer) throws -> EventTapInst
     // https://stackoverflow.com/a/31898592/1444152
 
     let mouseMoved = 1 << CGEventType.mouseMoved.rawValue
+    let flagsChanged = 1 << CGEventType.flagsChanged.rawValue
     let leftDragged = 1 << CGEventType.leftMouseDragged.rawValue
     let rightDragged = 1 << CGEventType.rightMouseDragged.rawValue
     let otherDragged = 1 << CGEventType.otherMouseDragged.rawValue
@@ -900,8 +902,7 @@ private func enableTap(userInfo: UnsafeMutableRawPointer) throws -> EventTapInst
     let rightUp = 1 << CGEventType.rightMouseUp.rawValue
     let otherDown = 1 << CGEventType.otherMouseDown.rawValue
     let otherUp = 1 << CGEventType.otherMouseUp.rawValue
-
-    let eventMask = mouseMoved | leftDragged | rightDragged | otherDragged |
+    let eventMask = mouseMoved | flagsChanged | leftDragged | rightDragged | otherDragged |
                     leftDown | leftUp | rightDown | rightUp | otherDown | otherUp
     guard let eventTap = CGEvent.tapCreate(
         tap: .cghidEventTap,

@@ -49,6 +49,73 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(window.origin, .zero)
     }
 
+    func testFlagsChangedActivatesMoveAtEventLocationWithoutBeingAbsorbed() throws {
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window)
+
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 10, y: 10)),
+            type: .flagsChanged
+        ))
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 14, y: 10)),
+            type: .flagsChanged
+        ))
+        fireTimer()
+
+        XCTAssertEqual(window.origin, CGPoint(x: 4, y: 0))
+    }
+
+    func testFlagsChangedDeactivatesMoveBeforeNextMouseEvent() throws {
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window)
+
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: .maskControl, location: .zero),
+            type: .flagsChanged
+        ))
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: [], location: CGPoint(x: 12, y: 0)),
+            type: .flagsChanged
+        ))
+        XCTAssertEqual(window.origin, CGPoint(x: 12, y: 0))
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: [], location: CGPoint(x: 12, y: 0)),
+            type: .leftMouseDown
+        ))
+    }
+
+    func testFlagsChangedTransitionsBetweenMoveAndResizeWithoutBeingAbsorbed() throws {
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window)
+
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: .maskControl, location: .zero),
+            type: .flagsChanged
+        ))
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 10, y: 0)),
+            type: .flagsChanged
+        ))
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: .maskAlternate, location: CGPoint(x: 20, y: 0)),
+            type: .flagsChanged
+        ))
+        fireTimer()
+        XCTAssertEqual(window.size.width, 110)
+
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 20, y: 0)),
+            type: .flagsChanged
+        ))
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 25, y: 0)),
+            type: .flagsChanged
+        ))
+        fireTimer()
+        XCTAssertEqual(window.origin.x, 5)
+    }
+
     func testModifierReleaseEndsOperationWithoutConsumingMouseUp() throws {
         let tracker = try makeTracker(window: FakeWindow())
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))

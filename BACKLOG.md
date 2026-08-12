@@ -95,43 +95,11 @@ Evidence: a hosted-app test invokes the Command-Comma menu item and verifies the
 - [ ] DOD1 — The Settings window is checked with Accessibility Inspector.
 - [x] DOD2 — The README screenshot reflects the shipped interface.
 
-### AR-011 — Commit window frames on a timer instead of inside the event-tap callback
-
-- Status: Done
-- Priority: P1
-- Dependencies: None
-
-Reverse-engineering HyperDock's `HDWindowDragHelper` shows its smoothness comes from decoupling input sampling from Accessibility writes. Its HID event callback performs only float math and stores a `windowMovementTargetRect`; a `dispatch_source` timer (requested 5 ms interval, 1 ms leeway — requested cadence, not a guaranteed rate) on a global concurrent queue dirty-checks the target against `windowMovementLastCommittedRect` and issues at most one `AXUIElementSetAttributeValue` per changed component. Appresize currently calls `window.setOrigin`/`window.setSize` synchronously inside the CGEventTap callback (`Tracker.move(to:)`/`resize(delta:)` in `Appresize/Tracker.swift`). A slow target app blocks the callback, events back up at the HID tap, and macOS disables the tap after about a second — the failure the `tapDisabledByTimeout` re-enable path and `maxEventAbsorptionTime` watchdog currently compensate for.
-
-#### Implementation tasks
-
-- [x] T1 — Add `targetOrigin`/`targetSize` (or a single `targetRect`), `lastCommittedRect`, and a `generation` counter to `TrackingInfo` (`Appresize/TrackingInfo.swift`); `move(to:)`/`resize(delta:)` update only the target fields and keep all existing math (display constraints via `constrainedOrigin`, corner handling, minimum-size clamping). All of these fields are guarded by the state lock defined in T3 — `generation` included; no field is a loose atomic.
-- [x] T2 — Add a `DispatchSourceTimer` (5 ms interval, 1 ms leeway) started in `startTracking(at:state:)` and cancelled in `resetTrackingState()`; its handler snapshots state and enqueues commit work only when the target rect differs from the last committed rect (a fast path only — the authoritative duplicate check is at write time, T3c); the commit queue calls `TrackingWindow.setOrigin`/`setSize` for changed components and records the committed rect under the state lock.
-- [x] T3 — Make the state thread-safe without ever blocking the callback on AX. Three separate mechanisms — do not conflate them: (a) a state lock guarding `TrackingInfo`: the event callback mutates the target rect under this lock, performs no AX calls, and never dispatches synchronously to the commit queue; (b) the timer tick: acquires the state lock, copies an immutable snapshot (window, target rect, generation), releases the lock, and enqueues the commit work — it never performs AX inline; (c) a single serial commit queue: the only place AX writes execute, and the source of FIFO ordering. Each enqueued commit, immediately before its AX call and under the state lock, validates cancellation and generation AND re-checks its snapshot rect against the current `lastCommittedRect`, skipping the write when equal — two ticks can snapshot the same target while a prior commit is still queued, so snapshot-time checking alone permits duplicate writes. After writing, it records `lastCommittedRect` under the state lock only if the generation is unchanged. Every `generation` access — increment, snapshot read, pre-write validation — happens under the state lock. The invariant: a slow AX write may occupy the commit queue but must never block the event callback or the state lock.
-- [x] T4 — Generation and ordering protocol: increment `generation` in `startTracking` only, under the state lock (not in reset). `resetTrackingState()` captures the final-commit snapshot under the state lock, enqueues an UNCONDITIONAL final commit on the commit queue (never generation-aborted: it is the ended drag's authoritative last write and always supersedes any in-flight tick for that drag), cancels the timer, then clears state under the lock. Cancel the timer before clearing `trackingInfo.window`.
-- [x] T5 — Remove the `moveFilterInterval`/`resizeFilterInterval` time throttles; the timer is the throttle. Keep the `lastEventTime` absorption-watchdog behavior unchanged.
-- [x] T6 — The final commit is dispatched to the commit queue; the event callback never waits for it (the window settles within one tick of release). Commit failures must reset tracking state exactly as write failures do today (including the main-thread hop for `Tracker.disable()` on permission loss).
-
-#### Acceptance criteria
-
-- [x] AC1 — During an active move/resize, the event-tap callback performs no `AXUIElementSetAttributeValue` calls; all AX writes originate from the commit queue (timer tick or enqueued final commit), never from the callback.
-- [x] AC2 — A slow or hung target app no longer triggers tap-disabled-by-timeout during a drag (the callback cannot block on AX).
-- [x] AC3 — No AX write is issued for a rect equal to the current `lastCommittedRect` at write time — including when two ticks enqueue the same target before the first commit runs (duplicate suppression happens at write time under the state lock, not only at snapshot time).
-- [x] AC4 — The window keeps up with fast mouse movement, and the final frame matches the cursor position at modifier release.
-- [x] AC5 — A stale commit that has not yet started its AX write never starts (cancellation and generation are validated on the commit queue immediately before the AX call). A commit already inside the AX write may land late; because commits are serialized on one queue, it is always followed by the ended drag's unconditional final commit, so the window settles at the final target rect even across an immediate reset or new drag. Demonstrated by deterministic gated-commit tests (blocked tick vs reset vs new drag) plus a TSAN-clean stress run.
-
-#### Definition of Done
-
-- [x] DOD1 — `AppresizeTests/TrackerTests.swift` gains coverage: commits are dirty-checked, two enqueued duplicates of one target produce exactly one AX write, the final commit fires on stop, timer failure resets state, and the blocked-tick-vs-reset race is exercised. Follow the existing `makeTracker(window:)`/`FakeWindow`/injectable-`now` pattern; make the timer and commit gate injectable via `Tracker.Dependencies` so tests stay deterministic.
-- [x] DOD2 — No new framework, runloop, or process is introduced.
-
-Evidence: all 71 unit tests pass. Deterministic Tracker tests cover dirty checks, queued duplicate suppression, asynchronous final/failure handling—including a failed tick suppressing its already-queued final retry—and blocked tick/reset/new-drag ordering; the three concurrency race/stress cases also pass with Thread Sanitizer enabled.
-
 ### AR-012 — Remove per-event AX read-back verification during drags
 
 - Status: Open
 - Priority: P1
-- Dependencies: AR-011
+- Dependencies: None
 
 HyperDock writes `AXPosition`/`AXSize` fire-and-forget and never reads the frame back mid-drag; it trusts its own computed rect and lets the next mouse event re-anchor (it computes from `moveResizeInitialWindowRect` + absolute displacement from drag start, so app-side clamping self-corrects on the next event). Appresize verifies every write with blocking reads: `move(to:)` does `setOrigin` → `origin()`; `resize(delta:)` does `setSize` → `size()` → `setOrigin` → `origin()` — up to four synchronous AX round-trips per commit. Appresize already computes from `initialOrigin`/`initialLocation`, so the read-backs buy nothing during an active drag.
 
@@ -232,56 +200,6 @@ Window manipulation should communicate its active mode and avoid leaving windows
 
 Evidence: deterministic tests cover cursor restoration, display-coordinate conversion, cross-display boundaries, native minimum clamping, and failure cancellation; live multi-display verification remains.
 
-### AR-014 — Round mouse deltas to float precision
-
-- Status: Done
-- Priority: P2
-- Dependencies: None
-
-HyperDock converts mouse deltas double→float→double inside its move/resize handlers, dropping sub-pixel precision before applying them. Appresize applies full double-precision deltas from `trackingDelta(at:)`, so high-resolution input devices emit fractional positions and sizes that AX servers round anyway; quantizing the target rect achieves the same stability with a stronger, testable guarantee.
-
-#### Implementation tasks
-
-- [x] T1 — Quantize the computed target origin and size to integral points where the target rect is stored (`Tracker.move(to:)` / `resize(delta:)`), keeping deltas themselves at full precision. Quantizing the accumulated target — not each delta — means slow sub-pixel motion still accumulates and steps by 1 px when it crosses a boundary. Note: a double→float→double round-trip (HyperDock's mechanism) drops precision but does NOT quantize (100.1 stays fractional); it is not an acceptable substitute.
-- [x] T2 — Confirm rounding composes with the existing `Delta` accumulation and display-constraint math (no drift from repeated rounding).
-
-#### Acceptance criteria
-
-- [x] AC1 — Committed AX writes carry integral origins and sizes (rounded when the target rect is computed), and sub-pixel mouse noise alone never triggers an AX write.
-- [x] AC2 — Slow, small movements still accumulate and apply (quantization must not swallow sub-threshold motion over time).
-
-#### Definition of Done
-
-- [x] DOD1 — A `TrackerTests` case feeds sub-pixel deltas and asserts both the rounding and the no-drift accumulation.
-
-Evidence: all 40 `TrackerTests` pass. Focused move and resize cases verify sub-pixel noise produces no write, accumulated motion crosses the rounding threshold without drift, committed origins and sizes are integral, and moving a fractionally sized window does not resize it.
-
-### AR-015 — Run the event tap on a dedicated high-priority thread
-
-- Status: Done
-- Priority: P2
-- Dependencies: None
-
-HyperDock creates its event tap on a dedicated `NSThread` (`threadPriority = 1.0`) and attaches the tap's runloop source to that thread's runloop, so main-thread work never delays event handling. Appresize attaches the tap to the main runloop in `enableTap()` (`CFRunLoopAddSource(CFRunLoopGetCurrent(), …)` called from `Tracker.enable()`); menu tracking, the Settings window, or any main-thread stall delays the callback. After AR-011 the callback is cheap, so this is polish — but it also isolates the app from future callback regressions.
-
-#### Implementation tasks
-
-- [x] T1 — Create and start the tap on a dedicated thread with elevated priority; keep `Tracker.shared` lifecycle and state mutations serialized (define and document which queue/thread owns `currentState`, `trackingInfo`, and cursor changes — today everything implicitly happens on main; align with the AR-011 locking/snapshot protocol).
-- [x] T2 — Keep `Tracker.enable()`/`disable()` callable from the main thread; the `installEventTap == false` test path must remain main-thread-only.
-- [x] T3 — Preserve the `tapDisabledByTimeout` re-enable behavior on the tap thread.
-
-#### Acceptance criteria
-
-- [x] AC1 — The tap callback never executes on the main thread (assert via `Thread.isMainThread` in a debug check or test hook).
-- [x] AC2 — Enabling/disabling from the status menu and Settings remains race-free; no crash on rapid toggling.
-- [x] AC3 — Opening the Settings window or tracking a menu during an active drag does not delay window commits.
-
-#### Definition of Done
-
-- [x] DOD1 — Threading ownership is documented in `Tracker.swift`; existing tests pass unchanged.
-
-Evidence: all 75 unit tests pass unchanged and the Release build succeeds. Live Debug-build checks confirmed rapid Enabled toggling, responsive move/resize while opening Settings and tracking the status menu, and no callback-on-main assertion failure.
-
 ### AR-016 — Repost a synthetic mouseMoved when consuming drag events
 
 - Status: Open
@@ -304,29 +222,6 @@ While HyperDock consumes drag events during an active operation, it reposts an e
 #### Definition of Done
 
 - [ ] DOD1 — A `TrackerTests` case asserts the synthetic post occurs only in the active-absorb path (inject the post function through `Tracker.Dependencies` for testability).
-
-### AR-017 — Observe flagsChanged for keyboard-first activation
-
-- Status: Open
-- Priority: P3
-- Dependencies: None
-
-HyperDock's tap mask includes `keyDown`/`keyUp`/`flagsChanged`, so modifier transitions are evaluated the moment the chord is pressed or released — "press the shortcut, then move the mouse" is a first-class transition. Appresize infers state exclusively from mouse-event flags, so every transition waits for the next mouse event; a click that arrives immediately after releasing the chord can still be absorbed as part of the operation. Adding keyboard events routes every keystroke through our callback — scope this to `flagsChanged` only (modifier transitions carry no text input) and never consume keyboard events.
-
-#### Implementation tasks
-
-- [ ] T1 — Add `flagsChanged` to the tap mask in `enableTap()`; in `handleEvent`, treat it as a pure state re-evaluation (start/stop/transition exactly as a `mouseMoved` at the current location would) and always pass it through.
-- [ ] T2 — Obtain the cursor location for activation from the flagsChanged event's `CGEvent.location` (it carries the cursor position) or `NSEvent.mouseLocation`; confirm the coordinate space matches the tap's.
-- [ ] T3 — Keep keyboard events unconsumed in all paths; add a test asserting flagsChanged is never absorbed.
-
-#### Acceptance criteria
-
-- [ ] AC1 — State transitions (start/stop/move↔resize) take effect on the key event itself: releasing the chord ends the operation immediately, and a click right after release is never misinterpreted as part of an operation.
-- [ ] AC2 — No keyboard event is ever consumed or measurably delayed.
-
-#### Definition of Done
-
-- [ ] DOD1 — `TrackerTests` covers activation, deactivation, and move↔resize transitions driven purely by flagsChanged events.
 
 ## Deferred decision
 
