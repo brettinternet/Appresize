@@ -1,5 +1,73 @@
 import Cocoa
 
+typealias CGWindowInfo = [String: Any]
+
+struct CGWindowHit: Equatable {
+    let ownerPID: pid_t
+    let frame: CGRect
+    let title: String?
+}
+
+struct AXWindowMatchCandidate: Equatable {
+    let frame: CGRect?
+    let title: String?
+}
+
+func onScreenWindowInfo() -> [CGWindowInfo] {
+    CGWindowListCopyWindowInfo(
+        [.optionOnScreenOnly, .excludeDesktopElements],
+        kCGNullWindowID
+    ) as? [CGWindowInfo] ?? []
+}
+
+func frontmostWindow(
+    at position: CGPoint,
+    in windowInfo: [CGWindowInfo],
+    excludingPID: pid_t
+) -> CGWindowHit? {
+    for info in windowInfo {
+        guard (info[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+              let ownerPID = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+              ownerPID != excludingPID,
+              let bounds = info[kCGWindowBounds as String] as? NSDictionary else {
+            continue
+        }
+
+        var frame = CGRect.zero
+        guard CGRectMakeWithDictionaryRepresentation(bounds as CFDictionary, &frame),
+              frame.contains(position) else {
+            continue
+        }
+
+        return CGWindowHit(
+            ownerPID: ownerPID,
+            frame: frame,
+            title: info[kCGWindowName as String] as? String
+        )
+    }
+
+    return nil
+}
+
+func matchingWindowIndex(
+    for hit: CGWindowHit,
+    candidates: [AXWindowMatchCandidate],
+    tolerance: CGFloat = 2
+) -> Int? {
+    if let frameMatch = candidates.firstIndex(where: {
+        guard let frame = $0.frame else { return false }
+        return abs(frame.origin.x - hit.frame.origin.x) <= tolerance
+            && abs(frame.origin.y - hit.frame.origin.y) <= tolerance
+            && abs(frame.size.width - hit.frame.size.width) <= tolerance
+            && abs(frame.size.height - hit.frame.size.height) <= tolerance
+    }) {
+        return frameMatch
+    }
+
+    guard let title = hit.title, !title.isEmpty else { return nil }
+    return candidates.firstIndex { $0.title == title }
+}
+
 
 extension AXUIElement {
 
@@ -8,7 +76,85 @@ extension AXUIElement {
         return AXUIElementIsAttributeSettable(self, attribute as CFString, &settable) == .success && settable.boolValue
     }
 
+    private var windowFrame: CGRect? {
+        guard let origin, let size else { return nil }
+        return CGRect(origin: origin, size: size)
+    }
+
+    private var windowTitle: String? {
+        var value: CFTypeRef?
+        let result = withUnsafeMutablePointer(to: &value) { valuePtr in
+            AXUIElementCopyAttributeValue(
+                self,
+                NSAccessibility.Attribute.title as CFString,
+                valuePtr
+            )
+        }
+        guard result == .success else { return nil }
+        return value as? String
+    }
+
     class func window(at position: CGPoint) -> AXUIElement? {
+        window(
+            at: position,
+            windowInfoProvider: onScreenWindowInfo,
+            accessibilityWindowProvider: accessibilityWindow,
+            accessibilityHitTest: windowUsingAccessibilityHitTest
+        )
+    }
+
+    class func window(
+        at position: CGPoint,
+        windowInfoProvider: () -> [CGWindowInfo],
+        accessibilityWindowProvider: (CGWindowHit) -> AXUIElement?,
+        accessibilityHitTest: (CGPoint) -> AXUIElement?
+    ) -> AXUIElement? {
+        if let hit = frontmostWindow(
+            at: position,
+            in: windowInfoProvider(),
+            excludingPID: getpid()
+        ),
+        let matchedWindow = accessibilityWindowProvider(hit) {
+            return matchedWindow
+        }
+
+        return accessibilityHitTest(position)
+    }
+
+    private class func accessibilityWindow(matching hit: CGWindowHit) -> AXUIElement? {
+        let application = AXUIElementCreateApplication(hit.ownerPID)
+        let timeoutResult = AXUIElementSetMessagingTimeout(application, 0.5)
+        guard timeoutResult == .success else {
+            log(.debug, "Could not set Accessibility messaging timeout: \(timeoutResult.rawValue)")
+            return nil
+        }
+
+        var value: CFTypeRef?
+        let windowsResult = withUnsafeMutablePointer(to: &value) { valuePtr in
+            AXUIElementCopyAttributeValue(
+                application,
+                NSAccessibility.Attribute.windows as CFString,
+                valuePtr
+            )
+        }
+        guard windowsResult == .success,
+              let windows = value as? [AXUIElement] else {
+            return nil
+        }
+
+        let candidates = windows.map { window in
+            guard AXUIElementSetMessagingTimeout(window, 0.5) == .success else {
+                return AXWindowMatchCandidate(frame: nil, title: nil)
+            }
+            return AXWindowMatchCandidate(frame: window.windowFrame, title: window.windowTitle)
+        }
+        guard let matchIndex = matchingWindowIndex(for: hit, candidates: candidates) else {
+            return nil
+        }
+        return windows[matchIndex]
+    }
+
+    private class func windowUsingAccessibilityHitTest(at position: CGPoint) -> AXUIElement? {
         var element: AXUIElement?
         var selected: AXUIElement?
         let systemwideElement = AXUIElementCreateSystemWide()
