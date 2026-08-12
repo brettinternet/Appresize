@@ -278,6 +278,12 @@ class Tracker {
 
 
     @objc func readModifiers() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.readModifiers()
+            }
+            return
+        }
         guard let eventTapThread else {
             loadModifiers()
             return
