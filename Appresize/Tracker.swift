@@ -33,6 +33,92 @@ final class TrackingTimer {
     }
 }
 
+private struct EventTapInstallation {
+    let eventTap: CFMachPort
+    let runLoopSource: CFRunLoopSource?
+}
+
+
+private final class EventTapThread {
+    private let ready = DispatchSemaphore(value: 0)
+    private let activation = DispatchSemaphore(value: 0)
+    private let stopped = DispatchSemaphore(value: 0)
+    private var thread: Thread?
+    private var runLoop: CFRunLoop?
+    private var startupError: Swift.Error?
+    private(set) var eventTap: CFMachPort?
+
+    init(install: @escaping () throws -> EventTapInstallation) throws {
+        let thread = Thread { [weak self] in
+            self?.run(install: install)
+        }
+        thread.name = "cloud.brett.Appresize.event-tap"
+        thread.qualityOfService = .userInteractive
+        thread.threadPriority = 1.0
+        self.thread = thread
+        thread.start()
+        ready.wait()
+
+        if let startupError {
+            stopped.wait()
+            throw startupError
+        }
+    }
+
+    func startHandlingEvents() {
+        activation.signal()
+    }
+
+    func perform(_ work: @escaping () -> Void) {
+        guard let runLoop else { return }
+        CFRunLoopPerformBlock(runLoop, CFRunLoopMode.commonModes.rawValue, work)
+        CFRunLoopWakeUp(runLoop)
+    }
+
+    func performAndWait(_ work: @escaping () -> Void) {
+        let completed = DispatchSemaphore(value: 0)
+        perform {
+            work()
+            completed.signal()
+        }
+        completed.wait()
+    }
+
+    func stop() {
+        guard let runLoop else { return }
+        CFRunLoopPerformBlock(runLoop, CFRunLoopMode.commonModes.rawValue) {
+            CFRunLoopStop(runLoop)
+        }
+        CFRunLoopWakeUp(runLoop)
+        stopped.wait()
+        self.runLoop = nil
+        thread = nil
+    }
+
+    private func run(install: @escaping () throws -> EventTapInstallation) {
+        autoreleasepool {
+            do {
+                let installation = try install()
+                eventTap = installation.eventTap
+                runLoop = CFRunLoopGetCurrent()
+                ready.signal()
+                activation.wait()
+
+                CGEvent.tapEnable(tap: installation.eventTap, enable: true)
+                CFRunLoopRun()
+                disableTap(installation)
+                eventTap = nil
+            } catch {
+                startupError = error
+                ready.signal()
+            }
+        }
+        stopped.signal()
+    }
+}
+
+
+
 
 class Tracker {
 
@@ -102,14 +188,22 @@ class Tracker {
 
     private static let commitQueue = DispatchQueue(label: "cloud.brett.Appresize.window-commit")
 
+    // Tracker.shared is created and destroyed on the main thread. With a live
+    // tap, the tap thread exclusively owns currentState, modifier snapshots,
+    // drag-button state, and cursor changes. Tests that skip tap installation
+    // retain their existing main-thread ownership. trackingInfo and its
+    // generation/commit state are shared with timer and commit queues only
+    // through trackingLock; AX writes remain exclusive to commitQueue.
     static var shared: Tracker? = nil
 
     static func enable() {
+        assert(Thread.isMainThread)
         guard isTrusted(prompt: false) else {
             log(.debug, "❌ Cannot enable tracker: accessibility not trusted")
             return
         }
         do {
+            shared?.shutdown()
             shared = try .init()
         } catch {
             shared = nil
@@ -118,7 +212,8 @@ class Tracker {
     }
 
     static func disable() {
-        shared?.resetTrackingState()
+        assert(Thread.isMainThread)
+        shared?.shutdown()
         shared = nil
     }
 
@@ -141,8 +236,8 @@ class Tracker {
     }
 
     private let dependencies: Dependencies
-    private let eventTap: CFMachPort?
-    private let runLoopSource: CFRunLoopSource?
+    private var eventTapThread: EventTapThread?
+    private var eventTap: CFMachPort?
 
     private var currentState: State = .idle
     private var moveModifiers = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
@@ -159,30 +254,40 @@ class Tracker {
     init(dependencies: Dependencies = .live) throws {
         self.dependencies = dependencies
         if dependencies.installEventTap {
-            let res = try enableTap()
-            self.eventTap = res.eventTap
-            self.runLoopSource = res.runLoopSource
-        } else {
-            self.eventTap = nil
-            self.runLoopSource = nil
-        }
-        if dependencies.installEventTap {
-            NotificationCenter.default.addObserver(self, selector: #selector(readModifiers), name: UserDefaults.didChangeNotification, object: Current.defaults())
+            assert(Thread.isMainThread)
+            let tapThread = try EventTapThread { [unowned self] in
+                try enableTap(userInfo: Unmanaged.passUnretained(self).toOpaque())
+            }
+            eventTapThread = tapThread
+            eventTap = tapThread.eventTap
+            tapThread.startHandlingEvents()
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(readModifiers),
+                name: UserDefaults.didChangeNotification,
+                object: Current.defaults()
+            )
         }
     }
 
 
     deinit {
-        trackingTimer?.cancel()
-        restoreCursor()
-        if let eventTap {
-            disableTap(eventTap: eventTap, runLoopSource: runLoopSource)
-        }
+        shutdown()
         NotificationCenter.default.removeObserver(self)
     }
 
 
     @objc func readModifiers() {
+        guard let eventTapThread else {
+            loadModifiers()
+            return
+        }
+        eventTapThread.perform { [weak self] in
+            self?.loadModifiers()
+        }
+    }
+
+    private func loadModifiers() {
         moveModifiers = Modifiers<Move>(forKey: .moveModifiers, defaults: Current.defaults())
         resizeModifiers = Modifiers<Resize>(forKey: .resizeModifiers, defaults: Current.defaults())
         requireDragToActivate = Current.defaults().bool(forKey: DefaultsKeys.requireDragToActivate.rawValue)
@@ -728,11 +833,36 @@ class Tracker {
         }
         guard aborted.0 else { return }
         DispatchQueue.main.async { [weak self] in
-            self?.restoreCursor()
-            self?.currentState = .idle
-            self?.lastEventTime = 0
-            self?.activeDragButton = nil
+            guard let self else { return }
+            if let eventTapThread = self.eventTapThread {
+                eventTapThread.perform { [weak self] in
+                    self?.resetEventStateAfterCommitFailure()
+                }
+            } else {
+                self.resetEventStateAfterCommitFailure()
+            }
         }
+    }
+
+    private func resetEventStateAfterCommitFailure() {
+        restoreCursor()
+        currentState = .idle
+        lastEventTime = 0
+        activeDragButton = nil
+    }
+
+    private func shutdown() {
+        guard let eventTapThread else {
+            trackingTimer?.cancel()
+            restoreCursor()
+            return
+        }
+        eventTapThread.performAndWait { [weak self] in
+            self?.resetTrackingState()
+        }
+        eventTapThread.stop()
+        self.eventTapThread = nil
+        eventTap = nil
     }
 
     private func withTrackingLock<T>(_ body: () -> T) -> T {
@@ -751,7 +881,7 @@ extension Tracker {
 }
 
 
-private func enableTap() throws -> (eventTap: CFMachPort, runLoopSource: CFRunLoopSource?)  {
+private func enableTap(userInfo: UnsafeMutableRawPointer) throws -> EventTapInstallation {
     // https://stackoverflow.com/a/31898592/1444152
 
     let mouseMoved = 1 << CGEventType.mouseMoved.rawValue
@@ -764,7 +894,7 @@ private func enableTap() throws -> (eventTap: CFMachPort, runLoopSource: CFRunLo
     let rightUp = 1 << CGEventType.rightMouseUp.rawValue
     let otherDown = 1 << CGEventType.otherMouseDown.rawValue
     let otherUp = 1 << CGEventType.otherMouseUp.rawValue
-    
+
     let eventMask = mouseMoved | leftDragged | rightDragged | otherDragged |
                     leftDown | leftUp | rightDown | rightUp | otherDown | otherUp
     guard let eventTap = CGEvent.tapCreate(
@@ -773,33 +903,31 @@ private func enableTap() throws -> (eventTap: CFMachPort, runLoopSource: CFRunLo
         options: .defaultTap,
         eventsOfInterest: CGEventMask(eventMask),
         callback: myCGEventCallback,
-        userInfo: nil
+        userInfo: userInfo
     ) else {
         throw Tracker.Error.tapCreateFailed
     }
 
     let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
     CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
-    CGEvent.tapEnable(tap: eventTap, enable: true)
-
-    return (eventTap: eventTap, runLoopSource: runLoopSource)
+    return EventTapInstallation(eventTap: eventTap, runLoopSource: runLoopSource)
 }
 
 
-private func disableTap(eventTap: CFMachPort, runLoopSource: CFRunLoopSource?) {
+private func disableTap(_ installation: EventTapInstallation) {
     log(.debug, "Disabling event tap")
-    CGEvent.tapEnable(tap: eventTap, enable: false)
-    CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes);
+    CGEvent.tapEnable(tap: installation.eventTap, enable: false)
+    CFRunLoopRemoveSource(CFRunLoopGetCurrent(), installation.runLoopSource, .commonModes)
 }
 
 
 private func myCGEventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
-
-    guard let tracker = Tracker.shared else {
-        log(.debug, "🔴 tracker must not be nil")
+    assert(!Thread.isMainThread, "The event-tap callback must run on its dedicated thread")
+    guard let refcon else {
+        log(.error, "Event tap callback has no Tracker")
         return Unmanaged.passUnretained(event)
     }
-
+    let tracker = Unmanaged<Tracker>.fromOpaque(refcon).takeUnretainedValue()
     let absorbEvent = tracker.handleEvent(event, type: type)
 
     return absorbEvent ? nil : Unmanaged.passUnretained(event)
