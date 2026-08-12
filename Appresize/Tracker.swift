@@ -8,6 +8,31 @@
 
 import Cocoa
 
+final class TrackingTimer {
+    private let lock = NSLock()
+    private let cancelHandler: () -> Void
+    private var isCancelled = false
+
+    init(cancel: @escaping () -> Void) {
+        self.cancelHandler = cancel
+    }
+
+    func cancel() {
+        lock.lock()
+        guard !isCancelled else {
+            lock.unlock()
+            return
+        }
+        isCancelled = true
+        lock.unlock()
+        cancelHandler()
+    }
+
+    deinit {
+        cancel()
+    }
+}
+
 
 class Tracker {
 
@@ -24,10 +49,26 @@ class Tracker {
         var cursorCurrent: () -> NSCursor = { NSCursor.arrow }
         var cursorSet: (NSCursor) -> Void = { $0.set() }
         var cursorFor: (CursorKind) -> NSCursor = { _ in NSCursor.arrow }
+        var makeTimer: (@escaping () -> Void) -> TrackingTimer? = { handler in
+            let source = DispatchSource.makeTimerSource(
+                queue: DispatchQueue.global(qos: .userInteractive)
+            )
+            source.schedule(
+                deadline: .now() + .milliseconds(5),
+                repeating: .milliseconds(5),
+                leeway: .milliseconds(1)
+            )
+            source.setEventHandler(handler: handler)
+            source.resume()
+            return TrackingTimer(cancel: source.cancel)
+        }
+        var enqueueCommit: (@escaping () -> Void) -> Void
+        var commitGate: () -> Void = {}
+        var commitApplyGate: () -> Void = {}
         var installEventTap: Bool
 
         static var live: Self {
-            Self(
+            return Self(
                 trusted: { isTrusted(prompt: false) },
                 windowAt: { AXUIElement.window(at: $0)?.trackingWindow },
                 now: { CFAbsoluteTimeGetCurrent() },
@@ -51,14 +92,14 @@ class Tracker {
                         return NSCursor.frameResize(position: .topRight, directions: .all)
                     }
                 },
+                enqueueCommit: { work in Tracker.commitQueue.async(execute: work) },
                 installEventTap: true
             )
         }
     }
 
-    // constants to throttle moving and resizing
-    static let moveFilterInterval = 0.01
-    static let resizeFilterInterval = 0.02
+
+    private static let commitQueue = DispatchQueue(label: "cloud.brett.Appresize.window-commit")
 
     static var shared: Tracker? = nil
 
@@ -86,6 +127,17 @@ class Tracker {
 
 
     private let trackingInfo = TrackingInfo()
+    private let trackingLock = NSLock()
+    private var trackingTimer: TrackingTimer?
+
+
+    private struct CommitSnapshot {
+        let window: TrackingWindow
+        let rect: CGRect
+        let corner: Corner
+        let state: State
+        let commitState: CommitGenerationState
+    }
 
     private let dependencies: Dependencies
     private let eventTap: CFMachPort?
@@ -119,7 +171,8 @@ class Tracker {
 
 
     deinit {
-        resetTrackingState()
+        trackingTimer?.cancel()
+        restoreCursor()
         if let eventTap {
             disableTap(eventTap: eventTap, runLoopSource: runLoopSource)
         }
@@ -163,6 +216,7 @@ class Tracker {
             if isMouseUp,
                let storedButton = activeDragButton,
                event.getIntegerValueField(.mouseEventButtonNumber) == storedButton {
+                _ = updateTargetForRelease(at: event.location)
                 resetTrackingState()
                 return false
             }
@@ -205,6 +259,7 @@ class Tracker {
                     if handled { lastEventTime = currentTime }
                     return handled  // Block all mouse events while resizing
                 case (.moving, .idle), (.resizing, .idle):
+                    guard updateTargetForRelease(at: event.location) else { return false }
                     resetTrackingState()
                     return isMouseButtonEvent ? false : true  // Pass button transitions through
                 case (.moving, .resizing):
@@ -293,7 +348,18 @@ class Tracker {
         currentState = .idle
         lastEventTime = 0
         activeDragButton = nil
-        trackingInfo.reset()
+        finishTrackingInfo()
+    }
+
+    private func updateTargetForRelease(at location: CGPoint) -> Bool {
+        switch currentState {
+        case .moving:
+            return move(to: location)
+        case .resizing:
+            return resize(delta: trackingDelta(at: location))
+        case .idle:
+            return true
+        }
     }
 
     private func setCursor(for kind: CursorKind) {
@@ -329,7 +395,7 @@ class Tracker {
 
     @discardableResult
     private func startTracking(at location: CGPoint, state: State) -> Bool {
-        trackingInfo.reset()
+        finishTrackingInfo()
 
         guard let trackedWindow = dependencies.windowAt(location),
               let origin = trackedWindow.origin(),
@@ -352,62 +418,89 @@ class Tracker {
             return false
         }
 
-        trackingInfo.time = dependencies.now()
-        lastEventTime = trackingInfo.time
-        trackingInfo.window = trackedWindow
-        trackingInfo.origin = origin
-        trackingInfo.size = size
-        trackingInfo.corner = corner
-        trackingInfo.location = location
-        trackingInfo.initialOrigin = origin
-        trackingInfo.initialLocation = location
+        let startTime = dependencies.now()
+        let initialRect = CGRect(origin: origin, size: size)
+        let generation = withTrackingLock {
+            trackingInfo.generation &+= 1
+            let commitState = CommitGenerationState(
+                generation: trackingInfo.generation,
+                lastCommittedRect: initialRect
+            )
+            trackingInfo.window = trackedWindow
+            trackingInfo.origin = origin
+            trackingInfo.size = size
+            trackingInfo.corner = corner
+            trackingInfo.state = state
+            trackingInfo.location = location
+            trackingInfo.initialOrigin = origin
+            trackingInfo.initialLocation = location
+            trackingInfo.targetRect = initialRect
+            trackingInfo.lastCommittedRect = initialRect
+            trackingInfo.commitsCancelled = false
+            trackingInfo.commitState = commitState
+            return trackingInfo.generation
+        }
+        lastEventTime = startTime
+
+        guard let timer = dependencies.makeTimer({ [weak self] in
+            self?.timerFired()
+        }) else {
+            resetTrackingState()
+            return false
+        }
+        let timerIsCurrent = withTrackingLock {
+            guard trackingInfo.generation == generation,
+                  trackingInfo.commitState?.generation == generation,
+                  !trackingInfo.commitsCancelled else { return false }
+            trackingTimer = timer
+            return true
+        }
+        if !timerIsCurrent {
+            timer.cancel()
+            return false
+        }
+
         setCursor(for: state == .moving ? .move : .resize(corner))
         return true
     }
 
-
     private func trackingDelta(at location: CGPoint) -> Delta {
-        let delta = location - trackingInfo.location
-        trackingInfo.location = location
-        return Delta(dx: delta.x, dy: delta.y)
+        withTrackingLock {
+            let delta = location - trackingInfo.location
+            trackingInfo.location = location
+            return Delta(dx: delta.x, dy: delta.y)
+        }
     }
 
-
     private func move(to location: CGPoint) -> Bool {
-        guard let window = trackingInfo.window else {
+        let hasWindow = withTrackingLock { trackingInfo.window != nil }
+        guard hasWindow else {
             log(.debug, "No window!")
             resetTrackingState()
             return false
         }
 
-        trackingInfo.location = location
-        let displacement = location - trackingInfo.initialLocation
-        trackingInfo.origin = constrainedOrigin(
-            proposed: trackingInfo.initialOrigin + Delta(dx: displacement.x, dy: displacement.y),
-            windowSize: trackingInfo.size,
-            displays: dependencies.displays()
-        )
-
-        guard (dependencies.now() - trackingInfo.time) > Tracker.moveFilterInterval else { return true }
-
-        guard window.setOrigin(trackingInfo.origin), let appliedOrigin = window.origin() else {
-            resetTrackingState()
-            return false
+        withTrackingLock {
+            trackingInfo.location = location
+            let displacement = location - trackingInfo.initialLocation
+            trackingInfo.origin = constrainedOrigin(
+                proposed: trackingInfo.initialOrigin + Delta(dx: displacement.x, dy: displacement.y),
+                windowSize: trackingInfo.size,
+                displays: dependencies.displays()
+            )
+            trackingInfo.targetRect = CGRect(
+                origin: trackingInfo.origin,
+                size: trackingInfo.size
+            )
         }
-        trackingInfo.origin = appliedOrigin
-        trackingInfo.time = dependencies.now()
         return true
     }
 
-
     private func resize(delta: Delta) -> Bool {
-        guard let window = trackingInfo.window else {
-            log(.debug, "No window!")
-            resetTrackingState()
-            return false
-        }
+        let targetIsValid = withTrackingLock {
+            guard trackingInfo.window != nil else { return false }
 
-        switch trackingInfo.corner {
+            switch trackingInfo.corner {
             case .topLeft:
                 trackingInfo.origin += delta
                 trackingInfo.size -= delta
@@ -419,71 +512,229 @@ class Tracker {
             case .bottomLeft:
                 trackingInfo.origin += Delta(dx: delta.dx, dy: 0)
                 trackingInfo.size += Delta(dx: -delta.dx, dy: delta.dy)
+            }
+
+            guard trackingInfo.origin.x.isFinite, trackingInfo.origin.y.isFinite,
+                  trackingInfo.size.width.isFinite, trackingInfo.size.height.isFinite else {
+                return false
+            }
+
+            let fixedRightEdge = trackingInfo.origin.x + trackingInfo.size.width
+            let fixedBottomEdge = trackingInfo.origin.y + trackingInfo.size.height
+            if trackingInfo.size.width < 1 {
+                trackingInfo.size.width = 1
+                if trackingInfo.corner == .topLeft || trackingInfo.corner == .bottomLeft {
+                    trackingInfo.origin.x = fixedRightEdge - trackingInfo.size.width
+                }
+            }
+            if trackingInfo.size.height < 1 {
+                trackingInfo.size.height = 1
+                if trackingInfo.corner == .topLeft || trackingInfo.corner == .topRight {
+                    trackingInfo.origin.y = fixedBottomEdge - trackingInfo.size.height
+                }
+            }
+
+            trackingInfo.targetRect = CGRect(
+                origin: trackingInfo.origin,
+                size: trackingInfo.size
+            )
+            return true
         }
 
-        guard trackingInfo.origin.x.isFinite, trackingInfo.origin.y.isFinite,
-              trackingInfo.size.width.isFinite, trackingInfo.size.height.isFinite else {
+        guard targetIsValid else {
             resetTrackingState()
             return false
         }
+        return true
+    }
 
-        let fixedRightEdge = trackingInfo.origin.x + trackingInfo.size.width
-        let fixedBottomEdge = trackingInfo.origin.y + trackingInfo.size.height
-        if trackingInfo.size.width < 1 {
-            trackingInfo.size.width = 1
-            if trackingInfo.corner == .topLeft || trackingInfo.corner == .bottomLeft {
-                trackingInfo.origin.x = fixedRightEdge - trackingInfo.size.width
+    private func timerFired() {
+        let snapshot = withTrackingLock {
+            commitSnapshotIfNeeded()
+        }
+        guard let snapshot else { return }
+        enqueueCommit(snapshot, unconditional: false)
+    }
+
+    private func finishTrackingInfo() {
+        let ended = withTrackingLock { () -> (CommitSnapshot?, TrackingTimer?) in
+            trackingInfo.commitsCancelled = true
+            if trackingInfo.commitState?.commitClaimed == false {
+                trackingInfo.commitState?.cancelled = true
+            }
+            let snapshot = trackingInfo.window.flatMap { window in
+                trackingInfo.commitState.map {
+                    CommitSnapshot(
+                        window: window,
+                        rect: trackingInfo.targetRect,
+                        corner: trackingInfo.corner,
+                        state: trackingInfo.state,
+                        commitState: $0
+                    )
+                }
+            }
+            return (snapshot, trackingTimer)
+        }
+
+        if let snapshot = ended.0 {
+            enqueueCommit(snapshot, unconditional: true)
+        }
+        ended.1?.cancel()
+
+        withTrackingLock {
+            trackingTimer = nil
+            trackingInfo.reset()
+        }
+    }
+
+    private func commitSnapshotIfNeeded() -> CommitSnapshot? {
+        guard !trackingInfo.commitsCancelled,
+              let window = trackingInfo.window,
+              let commitState = trackingInfo.commitState,
+              trackingInfo.targetRect != commitState.lastCommittedRect else {
+            return nil
+        }
+        return CommitSnapshot(
+            window: window,
+            rect: trackingInfo.targetRect,
+            corner: trackingInfo.corner,
+            state: trackingInfo.state,
+            commitState: commitState
+        )
+    }
+
+    private func enqueueCommit(_ snapshot: CommitSnapshot, unconditional: Bool) {
+        dependencies.enqueueCommit {
+            self.commit(snapshot, unconditional: unconditional)
+        }
+    }
+
+    private func commit(_ snapshot: CommitSnapshot, unconditional: Bool) {
+        dependencies.commitGate()
+        let lastCommittedRect = withTrackingLock { () -> CGRect? in
+            guard !snapshot.commitState.failed else { return nil }
+            if !unconditional {
+                guard !snapshot.commitState.cancelled,
+                      trackingInfo.commitState === snapshot.commitState,
+                      snapshot.rect != snapshot.commitState.lastCommittedRect else {
+                    return nil
+                }
+            }
+            guard snapshot.rect != snapshot.commitState.lastCommittedRect else {
+                return nil
+            }
+            // Linearization point: after this claim the commit has started.
+            // Reset invalidates only unclaimed work, so an in-flight write is
+            // always followed by the ended generation's queued final commit.
+            snapshot.commitState.commitClaimed = true
+            return snapshot.commitState.lastCommittedRect
+        }
+        guard let lastCommittedRect else { return }
+        dependencies.commitApplyGate()
+
+        let appliedRect = apply(
+            snapshot,
+            lastCommittedRect: lastCommittedRect
+        )
+        guard let appliedRect else {
+            handleCommitFailure(for: snapshot.commitState)
+            return
+        }
+
+        withTrackingLock {
+            snapshot.commitState.lastCommittedRect = appliedRect
+            snapshot.commitState.commitClaimed = false
+            guard trackingInfo.commitState === snapshot.commitState else { return }
+            trackingInfo.lastCommittedRect = appliedRect
+            if trackingInfo.targetRect == snapshot.rect {
+                trackingInfo.targetRect = appliedRect
+                trackingInfo.origin = appliedRect.origin
+                trackingInfo.size = appliedRect.size
             }
         }
-        if trackingInfo.size.height < 1 {
-            trackingInfo.size.height = 1
-            if trackingInfo.corner == .topLeft || trackingInfo.corner == .topRight {
-                trackingInfo.origin.y = fixedBottomEdge - trackingInfo.size.height
-            }
-        }
+    }
 
-        guard (dependencies.now() - trackingInfo.time) > Tracker.resizeFilterInterval else { return true }
+    private func apply(
+        _ snapshot: CommitSnapshot,
+        lastCommittedRect: CGRect
+    ) -> CGRect? {
+        let sizeChanged = snapshot.rect.size != lastCommittedRect.size
+        let originChanged = snapshot.rect.origin != lastCommittedRect.origin
 
-        let requestedOrigin = trackingInfo.origin
-        let requestedSize = trackingInfo.size
-        guard window.setSize(requestedSize), let appliedSize = window.size() else {
-            resetTrackingState()
-            return false
+        var appliedSize = snapshot.rect.size
+        if sizeChanged {
+            guard snapshot.window.setSize(snapshot.rect.size),
+                  let readSize = snapshot.window.size() else { return nil }
+            appliedSize = readSize
         }
 
         let appliedRequestedOrigin: CGPoint
-        switch trackingInfo.corner {
-            case .topLeft:
-                appliedRequestedOrigin = CGPoint(
-                    x: requestedOrigin.x + requestedSize.width - appliedSize.width,
-                    y: requestedOrigin.y + requestedSize.height - appliedSize.height
-                )
-            case .topRight:
-                appliedRequestedOrigin = CGPoint(
-                    x: requestedOrigin.x,
-                    y: requestedOrigin.y + requestedSize.height - appliedSize.height
-                )
-            case .bottomRight:
-                appliedRequestedOrigin = requestedOrigin
-            case .bottomLeft:
-                appliedRequestedOrigin = CGPoint(
-                    x: requestedOrigin.x + requestedSize.width - appliedSize.width,
-                    y: requestedOrigin.y
-                )
+        switch snapshot.corner {
+        case .topLeft:
+            appliedRequestedOrigin = CGPoint(
+                x: snapshot.rect.origin.x + snapshot.rect.width - appliedSize.width,
+                y: snapshot.rect.origin.y + snapshot.rect.height - appliedSize.height
+            )
+        case .topRight:
+            appliedRequestedOrigin = CGPoint(
+                x: snapshot.rect.origin.x,
+                y: snapshot.rect.origin.y + snapshot.rect.height - appliedSize.height
+            )
+        case .bottomRight:
+            appliedRequestedOrigin = snapshot.rect.origin
+        case .bottomLeft:
+            appliedRequestedOrigin = CGPoint(
+                x: snapshot.rect.origin.x + snapshot.rect.width - appliedSize.width,
+                y: snapshot.rect.origin.y
+            )
         }
 
-        if trackingInfo.corner != .bottomRight && !window.setOrigin(appliedRequestedOrigin) {
-            resetTrackingState()
-            return false
+        let shouldWriteOrigin = (snapshot.state == .resizing
+            && snapshot.corner != .bottomRight
+            && (originChanged || sizeChanged))
+            || (!sizeChanged && originChanged)
+        if shouldWriteOrigin && !snapshot.window.setOrigin(appliedRequestedOrigin) {
+            return nil
         }
-        guard let appliedOrigin = window.origin() else {
-            resetTrackingState()
-            return false
+        guard let appliedOrigin = snapshot.window.origin() else { return nil }
+        return CGRect(origin: appliedOrigin, size: appliedSize)
+    }
+
+    private func handleCommitFailure(for commitState: CommitGenerationState) {
+        let aborted = withTrackingLock { () -> (Bool, TrackingTimer?) in
+            commitState.commitClaimed = false
+            commitState.failed = true
+            guard trackingInfo.commitState === commitState else {
+                return (false, nil)
+            }
+            commitState.cancelled = true
+            trackingInfo.commitsCancelled = true
+            let timer = trackingTimer
+            trackingTimer = nil
+            trackingInfo.reset()
+            return (true, timer)
         }
-        trackingInfo.origin = appliedOrigin
-        trackingInfo.size = appliedSize
-        trackingInfo.time = dependencies.now()
-        return true
+        aborted.1?.cancel()
+
+        guard dependencies.trusted() else {
+            DispatchQueue.main.async {
+                Tracker.disable()
+            }
+            return
+        }
+        guard aborted.0 else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.restoreCursor()
+            self?.currentState = .idle
+            self?.lastEventTime = 0
+            self?.activeDragButton = nil
+        }
+    }
+
+    private func withTrackingLock<T>(_ body: () -> T) -> T {
+        trackingLock.lock()
+        defer { trackingLock.unlock() }
+        return body()
     }
 
 }

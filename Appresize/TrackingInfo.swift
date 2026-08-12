@@ -21,24 +21,46 @@ struct TrackingWindow {
     let setSize: (CGSize) -> Bool
 }
 
+final class CommitGenerationState {
+    let generation: UInt64
+    var lastCommittedRect: CGRect
+    var cancelled = false
+    var commitClaimed = false
+    var failed = false
+
+    init(generation: UInt64, lastCommittedRect: CGRect) {
+        self.generation = generation
+        self.lastCommittedRect = lastCommittedRect
+    }
+}
+
 class TrackingInfo {
-    var time: CFTimeInterval = 0
     var window: TrackingWindow? = nil
     var origin: CGPoint = .zero
     var size: CGSize = .zero
     var corner: Corner = .bottomRight
+    var state: State = .idle
     var location: CGPoint = .zero
     var initialOrigin: CGPoint = .zero
     var initialLocation: CGPoint = .zero
+    var targetRect: CGRect = .zero
+    var lastCommittedRect: CGRect = .zero
+    var generation: UInt64 = 0
+    var commitsCancelled = true
+    var commitState: CommitGenerationState?
 
     func reset() {
-        time = 0
         window = nil
         origin = .zero
         size = .zero
         corner = .bottomRight
+        state = .idle
         location = .zero
         initialOrigin = .zero
         initialLocation = .zero
+        targetRect = .zero
+        lastCommittedRect = .zero
+        commitsCancelled = true
+        commitState = nil
     }
 }

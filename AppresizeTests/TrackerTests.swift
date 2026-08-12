@@ -4,6 +4,7 @@ import XCTest
 final class TrackerTests: XCTestCase {
     private var defaults: UserDefaults!
     private var now: CFAbsoluteTime = 0
+    private var timers: TestTimerDriver!
 
     override func setUp() {
         super.setUp()
@@ -14,6 +15,7 @@ final class TrackerTests: XCTestCase {
         defaults.set(false, forKey: DefaultsKeys.resizeFromNearestCorner.rawValue)
         Current.defaults = { [unowned self] in self.defaults }
         now = 0
+        timers = TestTimerDriver()
     }
 
     override func tearDown() {
@@ -31,6 +33,7 @@ final class TrackerTests: XCTestCase {
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl, dx: 1, location: CGPoint(x: 1, y: 0)), type: .mouseMoved))
         now = 8
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl, dx: 1, location: CGPoint(x: 2, y: 0)), type: .mouseMoved))
+        fireTimer()
         XCTAssertEqual(window.origin.x, 2)
     }
 
@@ -65,11 +68,25 @@ final class TrackerTests: XCTestCase {
 
     func testDragOnlyEndsOnlyForMatchingMouseUp() throws {
         defaults.set(true, forKey: DefaultsKeys.requireDragToActivate.rawValue)
-        let tracker = try makeTracker(window: FakeWindow())
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl, button: 1), type: .leftMouseDragged))
-        XCTAssertFalse(tracker.handleEvent(event(flags: [], button: 2), type: .leftMouseUp))
-        XCTAssertFalse(tracker.handleEvent(event(flags: [], button: 1), type: .leftMouseUp))
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl, button: 1), type: .leftMouseDragged))
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window)
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, button: 1),
+            type: .leftMouseDragged
+        ))
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: [], button: 2, location: CGPoint(x: 5, y: 0)),
+            type: .leftMouseUp
+        ))
+        XCTAssertFalse(tracker.handleEvent(
+            event(flags: [], button: 1, location: CGPoint(x: 10, y: 0)),
+            type: .leftMouseUp
+        ))
+        XCTAssertEqual(window.origin, CGPoint(x: 10, y: 0))
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, button: 1, location: CGPoint(x: 10, y: 0)),
+            type: .leftMouseDragged
+        ))
     }
 
     func testNonSettableWindowDoesNotConsumeActivation() throws {
@@ -90,16 +107,31 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(window.size.width, 100)
     }
 
-    func testFailedWriteStopsTrackingImmediately() throws {
+    func testFailedWriteResetsTrackingAsynchronously() throws {
         let window = FakeWindow()
         window.failOriginWrite = true
         let tracker = try makeTracker(window: window)
 
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
-        now = 1
-        XCTAssertFalse(tracker.handleEvent(event(flags: .maskControl, dx: 1, location: CGPoint(x: 1, y: 0)), type: .mouseMoved))
-        now = 2
-        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 1, y: 0)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        XCTAssertEqual(window.originWriteCount, 1)
+        fireTimer()
+        XCTAssertEqual(window.originWriteCount, 1)
+        window.failOriginWrite = false
+
+        let resetCompleted = expectation(description: "write failure reset")
+        DispatchQueue.main.async {
+            XCTAssertTrue(tracker.handleEvent(
+                self.event(flags: .maskControl),
+                type: .mouseMoved
+            ))
+            resetCompleted.fulfill()
+        }
+        wait(for: [resetCompleted], timeout: 1)
     }
 
     func testResizeReadsBackClampedSizeBeforeReversing() throws {
@@ -110,13 +142,15 @@ final class TrackerTests: XCTestCase {
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate), type: .mouseMoved))
         now = 1
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -90, location: CGPoint(x: -90, y: 0)), type: .mouseMoved))
+        fireTimer()
         XCTAssertEqual(window.size.width, 50)
         now = 2
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 10, location: CGPoint(x: -80, y: 0)), type: .mouseMoved))
+        fireTimer()
         XCTAssertEqual(window.size.width, 60)
     }
 
-    func testResizeAccumulatesDeltasInsideFilterInterval() throws {
+    func testResizeAccumulatesDeltasBetweenTimerTicks() throws {
         let window = FakeWindow()
         let tracker = try makeTracker(window: window)
 
@@ -127,6 +161,7 @@ final class TrackerTests: XCTestCase {
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 2, location: CGPoint(x: 3, y: 0)), type: .mouseMoved))
         now = 0.030
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 3, location: CGPoint(x: 6, y: 0)), type: .mouseMoved))
+        fireTimer()
 
         XCTAssertEqual(window.size.width, 106)
     }
@@ -175,9 +210,11 @@ final class TrackerTests: XCTestCase {
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate), type: .mouseMoved))
         now = 1
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: -150, location: CGPoint(x: -150, y: 0)), type: .mouseMoved))
+        fireTimer()
         XCTAssertEqual(window.size.width, 50)
         now = 2
         XCTAssertTrue(tracker.handleEvent(event(flags: .maskAlternate, dx: 10, location: CGPoint(x: -140, y: 0)), type: .mouseMoved))
+        fireTimer()
         XCTAssertEqual(window.size.width, 60)
         XCTAssertEqual(cursorSets, 1)
     }
@@ -199,6 +236,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 1_900, dy: 1_000, location: CGPoint(x: 1_900, y: 1_000)),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin, CGPoint(x: 1_900, y: 776))
     }
 
@@ -220,6 +258,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 10, location: CGPoint(x: 1_001, y: 100)),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin.x, 931)
     }
 
@@ -237,6 +276,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 20, dy: 19, location: location),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin, .zero)
 
         now = 2
@@ -245,6 +285,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 0, dy: 0, location: movedLocation),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin, CGPoint(x: 0.5, y: 1.25))
     }
 
@@ -265,6 +306,7 @@ final class TrackerTests: XCTestCase {
                 type: .mouseMoved
             ))
         }
+        fireTimer()
         XCTAssertEqual(window.origin, CGPoint(x: 3, y: 0))
 
         now = 4
@@ -272,6 +314,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, location: start),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin, .zero)
     }
 
@@ -295,6 +338,7 @@ final class TrackerTests: XCTestCase {
                 type: .mouseMoved
             ))
         }
+        fireTimer()
 
         now = 0
         let fastWindow = FakeWindow()
@@ -309,6 +353,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 70, location: CGPoint(x: 1_060, y: 100)),
             type: .mouseMoved
         ))
+        fireTimer()
 
         XCTAssertEqual(slowWindow.origin, fastWindow.origin)
         XCTAssertEqual(fastWindow.origin.x, 990)
@@ -332,6 +377,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 10, location: CGPoint(x: 1_000, y: 100)),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin, CGPoint(x: 920, y: 100))
 
         now = 2
@@ -339,6 +385,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 10, dy: 100, location: CGPoint(x: 1_010, y: 200)),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin, CGPoint(x: 940, y: 200))
     }
 
@@ -360,6 +407,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 10, location: CGPoint(x: 160, y: 790)),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin, CGPoint(x: 110, y: 790))
     }
 
@@ -404,6 +452,7 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskControl, dx: 2_000, dy: 100, location: CGPoint(x: 2_000, y: 100)),
             type: .mouseMoved
         ))
+        fireTimer()
         XCTAssertEqual(window.origin, CGPoint(x: 920, y: 0))
     }
 
@@ -425,6 +474,7 @@ final class TrackerTests: XCTestCase {
             type: .mouseMoved
         ))
 
+        fireTimer()
         XCTAssertEqual(window.size, CGSize(width: 50, height: 40))
         XCTAssertEqual(window.origin, CGPoint(x: 150, y: 160))
         XCTAssertEqual(window.origin.x + window.size.width, 200)
@@ -442,11 +492,12 @@ final class TrackerTests: XCTestCase {
             event(flags: .maskAlternate, location: CGPoint(x: 100, y: 100)),
             type: .mouseMoved
         ))
-        now = 1
-        XCTAssertFalse(tracker.handleEvent(
+        XCTAssertTrue(tracker.handleEvent(
             event(flags: .maskAlternate, dx: -10, dy: -10, location: CGPoint(x: 90, y: 90)),
             type: .mouseMoved
         ))
+        fireTimer()
+        window.failSizeWrite = false
         XCTAssertEqual(window.origin, CGPoint(x: 100, y: 100))
     }
 
@@ -513,12 +564,191 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(trustChecks, 2)
     }
 
+    func testTimerCreationFailureResetsTracking() throws {
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window, makeTimer: { _ in nil })
+
+        XCTAssertFalse(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        XCTAssertFalse(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        XCTAssertEqual(window.originWriteCount, 0)
+        XCTAssertEqual(window.sizeWriteCount, 0)
+    }
+
+    func testTimerCommitsOnlyDirtyTargets() throws {
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window)
+
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        fireTimer()
+        XCTAssertEqual(window.originWriteCount, 0)
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 10, y: 5)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        fireTimer()
+
+        XCTAssertEqual(window.origin, CGPoint(x: 10, y: 5))
+        XCTAssertEqual(window.originWriteCount, 1)
+    }
+
+    func testQueuedDuplicateTargetsProduceOneWrite() throws {
+        let window = FakeWindow()
+        let commits = ManualCommitExecutor()
+        let tracker = try makeTracker(window: window, enqueueCommit: commits.enqueue)
+
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 10, y: 0)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        fireTimer()
+        XCTAssertEqual(commits.count, 2)
+
+        commits.runAll()
+
+        XCTAssertEqual(window.origin, CGPoint(x: 10, y: 0))
+        XCTAssertEqual(window.originWriteCount, 1)
+    }
+
+    func testFinalCommitUsesModifierReleaseLocationWithoutTimerTick() throws {
+        let window = FakeWindow()
+        let tracker = try makeTracker(window: window)
+
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 10, y: 5)),
+            type: .mouseMoved
+        ))
+        XCTAssertEqual(window.originWriteCount, 0)
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: [], location: CGPoint(x: 12, y: 7)),
+            type: .mouseMoved
+        ))
+
+        XCTAssertEqual(window.origin, CGPoint(x: 12, y: 7))
+        XCTAssertEqual(window.originWriteCount, 1)
+    }
+
+
+    func testFailedTickCancelsQueuedFinalCommit() throws {
+        let window = FakeWindow()
+        let gate = BlockingFirstCommitGate()
+        let commitQueue = DispatchQueue(label: "TrackerTests.failed-tick")
+        let tracker = try makeTracker(
+            window: window,
+            enqueueCommit: { work in commitQueue.async(execute: work) },
+            commitApplyGate: gate.enter
+        )
+
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 10, y: 0)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        XCTAssertTrue(gate.waitUntilBlocked(timeout: 1))
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: [], location: CGPoint(x: 12, y: 0)),
+            type: .mouseMoved
+        ))
+        window.failOriginWrite = true
+        gate.release()
+
+        let commitsFinished = expectation(description: "failed tick and final finished")
+        commitQueue.async { commitsFinished.fulfill() }
+        wait(for: [commitsFinished], timeout: 1)
+
+        XCTAssertEqual(window.originWriteCount, 1)
+        XCTAssertEqual(window.origin, .zero)
+    }
+
+    func testBlockedTickCannotOverwriteResetOrNewDrag() throws {
+        let window = FakeWindow()
+        let gate = BlockingFirstCommitGate()
+        let commitQueue = DispatchQueue(label: "TrackerTests.blocked-commit")
+        let tracker = try makeTracker(
+            window: window,
+            enqueueCommit: { work in commitQueue.async(execute: work) },
+            commitGate: gate.enter
+        )
+
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 10, y: 0)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+        XCTAssertTrue(gate.waitUntilBlocked(timeout: 1))
+
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: [], location: CGPoint(x: 10, y: 0)),
+            type: .mouseMoved
+        ))
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: .maskControl, location: CGPoint(x: 20, y: 0)),
+            type: .mouseMoved
+        ))
+        fireTimer()
+
+        gate.release()
+        let commitsFinished = expectation(description: "serialized commits finished")
+        commitQueue.async { commitsFinished.fulfill() }
+        wait(for: [commitsFinished], timeout: 1)
+
+        XCTAssertEqual(window.origin, CGPoint(x: 20, y: 0))
+        XCTAssertEqual(window.originWriteCount, 2)
+    }
+
+    func testConcurrentTimerStress() throws {
+        let window = FakeWindow()
+        let commitQueue = DispatchQueue(label: "TrackerTests.stress-commit")
+        let tracker = try makeTracker(
+            window: window,
+            enqueueCommit: { work in commitQueue.async(execute: work) }
+        )
+        let timerDriver = timers!
+        let timerGroup = DispatchGroup()
+
+        XCTAssertTrue(tracker.handleEvent(event(flags: .maskControl), type: .mouseMoved))
+        for step in 1...200 {
+            XCTAssertTrue(tracker.handleEvent(
+                event(flags: .maskControl, location: CGPoint(x: step, y: step)),
+                type: .mouseMoved
+            ))
+            timerGroup.enter()
+            DispatchQueue.global().async {
+                timerDriver.fireLatest()
+                timerGroup.leave()
+            }
+        }
+        timerGroup.wait()
+        XCTAssertTrue(tracker.handleEvent(
+            event(flags: [], location: CGPoint(x: 200, y: 200)),
+            type: .mouseMoved
+        ))
+
+        let commitsFinished = expectation(description: "stress commits finished")
+        commitQueue.async { commitsFinished.fulfill() }
+        wait(for: [commitsFinished], timeout: 2)
+        XCTAssertEqual(window.origin, CGPoint(x: 200, y: 200))
+    }
+
     private func makeTracker(
         window: FakeWindow,
         trusted: @escaping () -> Bool = { true },
         displays: @escaping () -> [DisplayFrame] = { [] },
         cursorSet: @escaping (NSCursor) -> Void = { _ in },
-        cursorFor: @escaping (Tracker.CursorKind) -> NSCursor = { _ in NSCursor.arrow }
+        cursorFor: @escaping (Tracker.CursorKind) -> NSCursor = { _ in NSCursor.arrow },
+        makeTimer: ((@escaping () -> Void) -> TrackingTimer?)? = nil,
+        enqueueCommit: @escaping (@escaping () -> Void) -> Void = { work in work() },
+        commitGate: @escaping () -> Void = {},
+        commitApplyGate: @escaping () -> Void = {}
     ) throws -> Tracker {
         try Tracker(dependencies: .init(
             trusted: trusted,
@@ -528,8 +758,16 @@ final class TrackerTests: XCTestCase {
             cursorCurrent: { NSCursor.arrow },
             cursorSet: cursorSet,
             cursorFor: cursorFor,
+            makeTimer: makeTimer ?? { self.timers.makeTimer(handler: $0) },
+            enqueueCommit: enqueueCommit,
+            commitGate: commitGate,
+            commitApplyGate: commitApplyGate,
             installEventTap: false
         ))
+    }
+
+    private func fireTimer() {
+        timers.fireLatest()
     }
 
     private func event(
@@ -554,8 +792,23 @@ final class TrackerTests: XCTestCase {
 }
 
 private final class FakeWindow {
-    var origin = CGPoint.zero
-    var size = CGSize(width: 100, height: 100)
+    private let lock = NSLock()
+    private var storedOrigin = CGPoint.zero
+    private var storedSize = CGSize(width: 100, height: 100)
+    private var storedOriginWriteCount = 0
+    private var storedSizeWriteCount = 0
+
+    var origin: CGPoint {
+        get { withLock { storedOrigin } }
+        set { withLock { storedOrigin = newValue } }
+    }
+    var size: CGSize {
+        get { withLock { storedSize } }
+        set { withLock { storedSize = newValue } }
+    }
+    var originWriteCount: Int { withLock { storedOriginWriteCount } }
+    var sizeWriteCount: Int { withLock { storedSizeWriteCount } }
+
     var canSetOrigin = true
     var canSetSize = true
     var failOriginWrite = false
@@ -565,26 +818,134 @@ private final class FakeWindow {
     var minimumHeight: CGFloat = 1
 
     lazy var trackingWindow = TrackingWindow(
-        origin: { [unowned self] in self.origin },
-        size: { [unowned self] in self.size },
-        canSetOrigin: { [unowned self] in self.canSetOrigin },
-        canSetSize: { [unowned self] in self.canSetSize },
-        setOrigin: { [unowned self] value in
-            guard !self.failOriginWrite else { return false }
-            if self.originWriteThreshold > 0,
-               value.distance(to: self.origin) < self.originWriteThreshold {
+        origin: { [unowned self] in origin },
+        size: { [unowned self] in size },
+        canSetOrigin: { [unowned self] in canSetOrigin },
+        canSetSize: { [unowned self] in canSetSize },
+        setOrigin: { [unowned self] value in setOrigin(value) },
+        setSize: { [unowned self] value in setSize(value) }
+    )
+
+    private func setOrigin(_ value: CGPoint) -> Bool {
+        withLock {
+            storedOriginWriteCount += 1
+            guard !failOriginWrite else { return false }
+            if originWriteThreshold > 0,
+               value.distance(to: storedOrigin) < originWriteThreshold {
                 return true
             }
-            self.origin = value
+            storedOrigin = value
             return true
-        },
-        setSize: { [unowned self] value in
-            guard !self.failSizeWrite else { return false }
-            self.size = CGSize(
-                width: max(self.minimumWidth, value.width),
-                height: max(self.minimumHeight, value.height)
+        }
+    }
+
+    private func setSize(_ value: CGSize) -> Bool {
+        withLock {
+            storedSizeWriteCount += 1
+            guard !failSizeWrite else { return false }
+            storedSize = CGSize(
+                width: max(minimumWidth, value.width),
+                height: max(minimumHeight, value.height)
             )
             return true
         }
-    )
+    }
+
+    private func withLock<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
+    }
+}
+
+private final class TestTimerDriver {
+    private final class Entry {
+        private let lock = NSLock()
+        private let handler: () -> Void
+        private var cancelled = false
+
+        init(handler: @escaping () -> Void) {
+            self.handler = handler
+        }
+
+        func cancel() {
+            lock.lock()
+            cancelled = true
+            lock.unlock()
+        }
+
+        func fire() {
+            lock.lock()
+            let shouldFire = !cancelled
+            lock.unlock()
+            if shouldFire {
+                handler()
+            }
+        }
+
+        var isActive: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return !cancelled
+        }
+    }
+
+    private let lock = NSLock()
+    private var entries: [Entry] = []
+
+    func makeTimer(handler: @escaping () -> Void) -> TrackingTimer {
+        let entry = Entry(handler: handler)
+        lock.lock()
+        entries.append(entry)
+        lock.unlock()
+        return TrackingTimer(cancel: entry.cancel)
+    }
+
+    func fireLatest() {
+        lock.lock()
+        let entry = entries.last(where: \.isActive)
+        lock.unlock()
+        entry?.fire()
+    }
+}
+
+private final class ManualCommitExecutor {
+    private var work: [() -> Void] = []
+
+    var count: Int { work.count }
+
+    func enqueue(_ block: @escaping () -> Void) {
+        work.append(block)
+    }
+
+    func runAll() {
+        while !work.isEmpty {
+            work.removeFirst()()
+        }
+    }
+}
+
+private final class BlockingFirstCommitGate {
+    private let lock = NSLock()
+    private let blocked = DispatchSemaphore(value: 0)
+    private let released = DispatchSemaphore(value: 0)
+    private var callCount = 0
+
+    func enter() {
+        lock.lock()
+        callCount += 1
+        let shouldBlock = callCount == 1
+        lock.unlock()
+        guard shouldBlock else { return }
+        blocked.signal()
+        released.wait()
+    }
+
+    func waitUntilBlocked(timeout: TimeInterval) -> Bool {
+        blocked.wait(timeout: .now() + timeout) == .success
+    }
+
+    func release() {
+        released.signal()
+    }
 }
