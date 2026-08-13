@@ -146,6 +146,24 @@ final class SystemAPITests: XCTestCase {
         XCTAssertNil(result)
     }
 
+    func testAccessibilityHitTestPreservesExternalProcess() throws {
+        let finderPID = try XCTUnwrap(
+            NSRunningApplication.runningApplications(
+                withBundleIdentifier: "com.apple.finder"
+            ).first?.processIdentifier
+        )
+        let externalApplication = AXUIElementCreateApplication(finderPID)
+
+        let result = AXUIElement.window(
+            at: .zero,
+            windowInfoProvider: { [] },
+            accessibilityWindowProvider: { _ in nil },
+            accessibilityHitTest: { _ in externalApplication }
+        )
+
+        XCTAssertTrue(CFEqual(result, externalApplication))
+    }
+
     private func windowInfo(
         pid: pid_t,
         frame: CGRect,

@@ -125,7 +125,8 @@ extension AXUIElement {
         }
 
         guard let hitTestWindow = accessibilityHitTest(position),
-              hitTestWindow.processIdentifier != getpid() else {
+              let pid = hitTestWindow.processIdentifier,
+              pid != getpid() else {
             return nil
         }
         return hitTestWindow
