@@ -1,5 +1,5 @@
 import XCTest
-@testable import Appresize
+@testable import HyperWindow
 
 final class TrackerTests: XCTestCase {
     private var defaults: UserDefaults!
@@ -20,7 +20,7 @@ final class TrackerTests: XCTestCase {
 
     override func tearDown() {
         Tracker.disable()
-        Current.defaults = { UserDefaults(suiteName: "cloud.brett.Appresize.prefs") ?? .standard }
+        Current.defaults = { UserDefaults(suiteName: "cloud.brett.HyperWindow.prefs") ?? .standard }
         super.tearDown()
     }
 

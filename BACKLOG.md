@@ -1,4 +1,4 @@
-# Appresize Backlog
+# HyperWindow Backlog
 
 Last reviewed: 2026-08-12
 
@@ -44,7 +44,7 @@ Manual first launch should explain the utility briefly, while background login l
 
 #### Implementation tasks
 
-- [x] T1 — Use the existing first-launch value to open Appresize Settings on the first manual launch.
+- [x] T1 — Use the existing first-launch value to open HyperWindow Settings on the first manual launch.
 - [x] T2 — Show the default move and resize modifier chords in clearly labeled shortcut groups.
 - [x] T3 — Add a `Grant Accessibility Access` action that invokes the native system prompt with the current System Settings fallback.
 - [x] T4 — Suppress modal permission alerts when launched as a login item.
@@ -75,16 +75,16 @@ The existing AppKit interface should follow current macOS naming, keyboard, and 
 
 #### Implementation tasks
 
-- [x] T1 — Rename `Preferences…` to `Settings…`, wire the existing Command-Comma item, and title the window `Appresize Settings`.
+- [x] T1 — Rename `Preferences…` to `Settings…`, wire the existing Command-Comma item, and title the window `HyperWindow Settings`.
 - [x] T2 — Remove irrelevant document-template menus and disable minimize for the Settings window.
 - [x] T3 — Display modifier keys as `⌘`, `⌥`, `⌃`, `⇧`, and `fn` in clearly labeled Move and Resize groups.
 - [x] T4 — Replace conflict-only beeps with the inline message `Move and Resize modifiers must differ.`
 - [x] T5 — Replace the mouse-only GitHub field with a keyboard- and VoiceOver-accessible link.
-- [x] T6 — Add standard `About Appresize` and `Report an Issue…` commands using existing app metadata and URLs.
+- [x] T6 — Add standard `About HyperWindow` and `Report an Issue…` commands using existing app metadata and URLs.
 
 #### Acceptance criteria
 
-- [x] AC1 — Command-Comma opens Settings from an active Appresize process.
+- [x] AC1 — Command-Comma opens Settings from an active HyperWindow process.
 - [ ] AC2 — Every Settings control and link is reachable and understandable with keyboard navigation and VoiceOver.
 - [x] AC3 — Invalid modifier combinations explain how to recover.
 
@@ -101,7 +101,7 @@ Evidence: a hosted-app test invokes the Command-Comma menu item and verifies the
 - Priority: P1
 - Dependencies: None
 
-HyperDock writes `AXPosition`/`AXSize` fire-and-forget and never reads the frame back mid-drag; it trusts its own computed rect and lets the next mouse event re-anchor (it computes from `moveResizeInitialWindowRect` + absolute displacement from drag start, so app-side clamping self-corrects on the next event). Appresize verifies every write with blocking reads: `move(to:)` does `setOrigin` → `origin()`; `resize(delta:)` does `setSize` → `size()` → `setOrigin` → `origin()` — up to four synchronous AX round-trips per commit. Appresize already computes from `initialOrigin`/`initialLocation`, so the read-backs buy nothing during an active drag.
+HyperDock writes `AXPosition`/`AXSize` fire-and-forget and never reads the frame back mid-drag; it trusts its own computed rect and lets the next mouse event re-anchor (it computes from `moveResizeInitialWindowRect` + absolute displacement from drag start, so app-side clamping self-corrects on the next event). HyperWindow verifies every write with blocking reads: `move(to:)` does `setOrigin` → `origin()`; `resize(delta:)` does `setSize` → `size()` → `setOrigin` → `origin()` — up to four synchronous AX round-trips per commit. HyperWindow already computes from `initialOrigin`/`initialLocation`, so the read-backs buy nothing during an active drag.
 
 #### Implementation tasks
 
@@ -125,7 +125,7 @@ HyperDock writes `AXPosition`/`AXSize` fire-and-forget and never reads the frame
 - Priority: P1
 - Dependencies: None
 
-HyperDock never calls `AXUIElementCopyElementAtPosition`. Its `+[OCWindow windowUnderMouse]` hit-tests with `CGWindowListCopyWindowInfo` (fast, pure CoreGraphics), then resolves the AX element once per drag: `AXUIElementCreateApplication(ownerPID)` → copy `AXWindows` → match candidates by position/size with a title fallback. Appresize's `AXUIElement.window(at:)` (`Appresize/AXUIElement+ext.swift`) uses the systemwide `AXUIElementCopyElementAtPosition` with a 0.5 s messaging timeout on the event-tap thread at every drag start — the slowest AX entry point and the one most prone to stalling on hung apps.
+HyperDock never calls `AXUIElementCopyElementAtPosition`. Its `+[OCWindow windowUnderMouse]` hit-tests with `CGWindowListCopyWindowInfo` (fast, pure CoreGraphics), then resolves the AX element once per drag: `AXUIElementCreateApplication(ownerPID)` → copy `AXWindows` → match candidates by position/size with a title fallback. HyperWindow's `AXUIElement.window(at:)` (`HyperWindow/AXUIElement+ext.swift`) uses the systemwide `AXUIElementCopyElementAtPosition` with a 0.5 s messaging timeout on the event-tap thread at every drag start — the slowest AX entry point and the one most prone to stalling on hung apps.
 
 #### Implementation tasks
 
@@ -206,7 +206,7 @@ Evidence: deterministic tests cover cursor restoration, display-coordinate conve
 - Priority: P2
 - Dependencies: None
 
-While HyperDock consumes drag events during an active operation, it reposts an equivalent `mouseMoved` (`CGEventCreateMouseEvent` + `CGEventPost`) so the target app keeps receiving hover and cursor updates. Appresize swallows consumed events (returns nil from `myCGEventCallback`), so hovered UI in the target app freezes mid-drag.
+While HyperDock consumes drag events during an active operation, it reposts an equivalent `mouseMoved` (`CGEventCreateMouseEvent` + `CGEventPost`) so the target app keeps receiving hover and cursor updates. HyperWindow swallows consumed events (returns nil from `myCGEventCallback`), so hovered UI in the target app freezes mid-drag.
 
 #### Implementation tasks
 

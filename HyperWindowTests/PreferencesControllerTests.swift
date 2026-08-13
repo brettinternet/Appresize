@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import Appresize
+@testable import HyperWindow
 
 @MainActor
 final class PreferencesControllerTests: XCTestCase {

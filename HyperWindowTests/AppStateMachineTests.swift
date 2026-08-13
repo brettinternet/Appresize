@@ -1,5 +1,5 @@
 import XCTest
-@testable import Appresize
+@testable import HyperWindow
 
 
 class AppStateMachineTests: XCTestCase {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Parse conventional Appresize release tags and expose their version fields.
+# Parse conventional HyperWindow release tags and expose their version fields.
 release_version_parse() {
   local tag=${1-}
 

@@ -162,12 +162,12 @@ class PreferencesController: NSWindowController {
             ]
         )
         githubLink.setAccessibilityRole(.link)
-        githubLink.setAccessibilityLabel("View Appresize on GitHub")
-        githubLink.setAccessibilityHelp("Opens the Appresize source repository in your browser")
+        githubLink.setAccessibilityLabel("View HyperWindow on GitHub")
+        githubLink.setAccessibilityHelp("Opens the HyperWindow source repository in your browser")
     }
     
     @objc private func githubLinkClicked(_ sender: Any) {
-        let url = URL(string: "https://github.com/brettinternet/Appresize")!
+        let url = URL(string: "https://github.com/brettinternet/HyperWindow")!
         NSWorkspace.shared.open(url)
     }
     
@@ -287,8 +287,8 @@ extension PreferencesController: NSWindowDelegate {
 
     private func showLoginItemApprovalAlert() {
         let alert = NSAlert()
-        alert.messageText = "Allow Appresize in Login Items"
-        alert.informativeText = "Open System Settings → General → Login Items and allow Appresize."
+        alert.messageText = "Allow HyperWindow in Login Items"
+        alert.informativeText = "Open System Settings → General → Login Items and allow HyperWindow."
         alert.addButton(withTitle: "Open Login Items")
         alert.addButton(withTitle: "Later")
         if alert.runModal() == .alertFirstButtonReturn {
@@ -300,7 +300,7 @@ extension PreferencesController: NSWindowDelegate {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Could not update Login Items"
-        alert.informativeText = "Appresize could not change its Login Items setting. Please try again in System Settings → General → Login Items."
+        alert.informativeText = "HyperWindow could not change its Login Items setting. Please try again in System Settings → General → Login Items."
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }

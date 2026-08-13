@@ -1,5 +1,5 @@
 import Foundation
-@testable import Appresize
+@testable import HyperWindow
 
 func testUserDefaults() -> UserDefaults {
     let bundleId = Bundle.main.bundleIdentifier!

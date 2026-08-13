@@ -172,7 +172,7 @@ extension AppDelegate {
             let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
             statusItem.menu = statusMenu
             statusItem.button?.image = NSImage(named: "MenuIcon")
-            statusItem.button?.setAccessibilityLabel("Appresize status")
+            statusItem.button?.setAccessibilityLabel("HyperWindow status")
             return statusItem
         }()
         statusMenu?.autoenablesItems = false

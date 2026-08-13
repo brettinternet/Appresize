@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "8BB8F8E02D1A21740087BA54"
-               BuildableName = "Appresize.app"
-               BlueprintName = "Appresize"
-               ReferencedContainer = "container:Appresize.xcodeproj">
+               BuildableName = "HyperWindow.app"
+               BlueprintName = "HyperWindow"
+               ReferencedContainer = "container:HyperWindow.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
                   <BuildableReference
                      BuildableIdentifier = "primary"
                      BlueprintIdentifier = "8BB8F8E02D1A21740087BA54"
-                     BuildableName = "Appresize.app"
-                     BlueprintName = "Appresize"
-                     ReferencedContainer = "container:Appresize.xcodeproj">
+                     BuildableName = "HyperWindow.app"
+                     BlueprintName = "HyperWindow"
+                     ReferencedContainer = "container:HyperWindow.xcodeproj">
                   </BuildableReference>
                </EnvironmentBuildable>
             </ActionContent>
@@ -55,9 +55,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "8BB8F8F12D1A21750087BA54"
-               BuildableName = "AppresizeTests.xctest"
-               BlueprintName = "AppresizeTests"
-               ReferencedContainer = "container:Appresize.xcodeproj">
+               BuildableName = "HyperWindowTests.xctest"
+               BlueprintName = "HyperWindowTests"
+               ReferencedContainer = "container:HyperWindow.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -77,9 +77,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "8BB8F8E02D1A21740087BA54"
-            BuildableName = "Appresize.app"
-            BlueprintName = "Appresize"
-            ReferencedContainer = "container:Appresize.xcodeproj">
+            BuildableName = "HyperWindow.app"
+            BlueprintName = "HyperWindow"
+            ReferencedContainer = "container:HyperWindow.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -94,9 +94,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "8BB8F8E02D1A21740087BA54"
-            BuildableName = "Appresize.app"
-            BlueprintName = "Appresize"
-            ReferencedContainer = "container:Appresize.xcodeproj">
+            BuildableName = "HyperWindow.app"
+            BlueprintName = "HyperWindow"
+            ReferencedContainer = "container:HyperWindow.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

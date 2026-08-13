@@ -28,23 +28,23 @@ jobs:
       - name: Build tests
         run: |
           xcodebuild build-for-testing \
-            -project Appresize.xcodeproj \
-            -scheme Appresize \
+            -project HyperWindow.xcodeproj \
+            -scheme HyperWindow \
             -configuration Debug \
             -derivedDataPath build \
             -destination 'platform=macOS'
           /usr/bin/xcrun swift ./scripts/sign-local-app.swift \
-            build/Build/Products/Debug/Appresize.app
+            build/Build/Products/Debug/HyperWindow.app
       - name: Run tests
         timeout-minutes: 5
         run: |
           xcodebuild test-without-building \
-            -project Appresize.xcodeproj \
-            -scheme Appresize \
+            -project HyperWindow.xcodeproj \
+            -scheme HyperWindow \
             -configuration Debug \
             -derivedDataPath build \
             -destination 'platform=macOS' \
-            -only-testing:AppresizeTests
+            -only-testing:HyperWindowTests
       - name: Build and verify release app
         run: ./scripts/build-release.sh
 
@@ -64,30 +64,30 @@ jobs:
       - name: Build tests
         run: |
           xcodebuild build-for-testing \
-            -project Appresize.xcodeproj \
-            -scheme Appresize \
+            -project HyperWindow.xcodeproj \
+            -scheme HyperWindow \
             -configuration Debug \
             -derivedDataPath build \
             -destination 'platform=macOS'
           /usr/bin/xcrun swift ./scripts/sign-local-app.swift \
-            build/Build/Products/Debug/Appresize.app
+            build/Build/Products/Debug/HyperWindow.app
       - name: Run tests
         timeout-minutes: 5
         run: |
           xcodebuild test-without-building \
-            -project Appresize.xcodeproj \
-            -scheme Appresize \
+            -project HyperWindow.xcodeproj \
+            -scheme HyperWindow \
             -configuration Debug \
             -derivedDataPath build \
             -destination 'platform=macOS' \
-            -only-testing:AppresizeTests
+            -only-testing:HyperWindowTests
       - name: Package release
         run: ./scripts/package-release.sh "$GITHUB_REF_NAME"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_NOTES: |
-            Download `Appresize-…-macos-universal.dmg` and verify its matching SHA-256 checksum.
+            Download `HyperWindow-…-macos-universal.dmg` and verify its matching SHA-256 checksum.
 
             The app is universal arm64/x86_64 and ad-hoc signed, not Developer ID signed or notarized. macOS may require Privacy & Security → Open Anyway.
         run: |
@@ -98,8 +98,8 @@ jobs:
             release_flags+=(--prerelease --latest=false)
           fi
           gh release create "$GITHUB_REF_NAME" \
-            "dist/Appresize-${GITHUB_REF_NAME}-macos-universal.dmg#Appresize universal macOS DMG" \
-            "dist/Appresize-${GITHUB_REF_NAME}-macos-universal.dmg.sha256#Appresize DMG SHA-256" \
+            "dist/HyperWindow-${GITHUB_REF_NAME}-macos-universal.dmg#HyperWindow universal macOS DMG" \
+            "dist/HyperWindow-${GITHUB_REF_NAME}-macos-universal.dmg.sha256#HyperWindow DMG SHA-256" \
             --title "$GITHUB_REF_NAME" \
             --verify-tag \
             "${release_flags[@]}" \

@@ -1,6 +1,6 @@
 import XCTest
 import ApplicationServices
-@testable import Appresize
+@testable import HyperWindow
 
 
 final class SystemAPITests: XCTestCase {

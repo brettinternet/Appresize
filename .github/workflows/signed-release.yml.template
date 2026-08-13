@@ -35,8 +35,8 @@ jobs:
         RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.version }}
       run: |
         set -euo pipefail
-        MARKETING_VERSION="$(xcodebuild -project Appresize.xcodeproj \
-          -scheme Appresize \
+        MARKETING_VERSION="$(xcodebuild -project HyperWindow.xcodeproj \
+          -scheme HyperWindow \
           -configuration Release \
           -showBuildSettings | \
           awk -F ' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ { print $2; exit }')"
@@ -69,11 +69,11 @@ jobs:
       env:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       run: |
-        xcodebuild -project Appresize.xcodeproj \
-                   -scheme Appresize \
+        xcodebuild -project HyperWindow.xcodeproj \
+                   -scheme HyperWindow \
                    -configuration Release \
                    -derivedDataPath build \
-                   -archivePath build/Appresize.xcarchive \
+                   -archivePath build/HyperWindow.xcarchive \
                    CODE_SIGN_IDENTITY="Developer ID Application" \
                    DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
                    CODE_SIGN_STYLE=Manual \
@@ -81,7 +81,7 @@ jobs:
                    
         # Export signed app
         xcodebuild -exportArchive \
-                   -archivePath build/Appresize.xcarchive \
+                   -archivePath build/HyperWindow.xcarchive \
                    -exportPath build/Export \
                    -exportOptionsPlist ExportOptions.plist
                    
@@ -93,17 +93,17 @@ jobs:
       run: |
         # Create ZIP for notarization
         cd build/Export
-        zip -r Appresize.zip Appresize.app
+        zip -r HyperWindow.zip HyperWindow.app
         
         # Submit for notarization
-        xcrun notarytool submit Appresize.zip \
+        xcrun notarytool submit HyperWindow.zip \
                               --apple-id "$APPLE_ID" \
                               --password "$APPLE_PASSWORD" \
                               --team-id "$APPLE_TEAM_ID" \
                               --wait
                               
         # Staple the notarization
-        xcrun stapler staple Appresize.app
+        xcrun stapler staple HyperWindow.app
         
     - name: Create signed DMG
       env:
@@ -111,7 +111,7 @@ jobs:
       run: |
         # Create staging directory
         mkdir -p dmg-staging
-        cp -R "build/Export/Appresize.app" dmg-staging/
+        cp -R "build/Export/HyperWindow.app" dmg-staging/
         ln -s /Applications dmg-staging/Applications
         
         # Get version
@@ -122,25 +122,25 @@ jobs:
         fi
         
         # Create and sign DMG
-        hdiutil create -volname "Appresize $VERSION" \
+        hdiutil create -volname "HyperWindow $VERSION" \
                        -srcfolder dmg-staging \
                        -ov -format UDZO \
-                       "Appresize-$VERSION.dmg"
+                       "HyperWindow-$VERSION.dmg"
                        
         # Sign DMG
         codesign --sign "Developer ID Application" \
                  --timestamp \
                  --options runtime \
-                 "Appresize-$VERSION.dmg"
+                 "HyperWindow-$VERSION.dmg"
                  
         # Verify signature
-        codesign --verify --verbose "Appresize-$VERSION.dmg"
-        spctl --assess --type install "Appresize-$VERSION.dmg"
+        codesign --verify --verbose "HyperWindow-$VERSION.dmg"
+        spctl --assess --type install "HyperWindow-$VERSION.dmg"
         
     - name: Create Release
       uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
       with:
-        files: Appresize-*.dmg
+        files: HyperWindow-*.dmg
         body: |
           ## Signed Release
           
@@ -149,8 +149,8 @@ jobs:
           ## Installation
           
           1. Download the DMG file below
-          2. Open the DMG and drag Appresize to your Applications folder
-          3. Launch Appresize from Applications
+          2. Open the DMG and drag HyperWindow to your Applications folder
+          3. Launch HyperWindow from Applications
           4. Grant accessibility permissions when prompted
           
           ## Requirements

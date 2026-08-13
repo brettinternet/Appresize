@@ -5,13 +5,13 @@ version: "3"
 dotenv: [.env]
 
 vars:
-  PROJECT: Appresize.xcodeproj
-  SCHEME: Appresize
+  PROJECT: HyperWindow.xcodeproj
+  SCHEME: HyperWindow
   BUILD_DIR: build
   CONFIGURATION_DEBUG: Debug
   CONFIGURATION_RELEASE: Release
   DESTINATION: "platform=macOS"
-  RELEASE_APP_PATH: build/Build/Products/Release/Appresize.app
+  RELEASE_APP_PATH: build/Build/Products/Release/HyperWindow.app
 
 tasks:
   default:
@@ -58,13 +58,13 @@ tasks:
     desc: Run unit tests only (excludes tests that require system permissions)
     deps: ["test:build"]
     cmds:
-      - ./scripts/test-preflight.sh xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests
+      - ./scripts/test-preflight.sh xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:HyperWindowTests
 
   test:all:
     desc: Run all tests (may require manual interaction for permissions)
     deps: ["test:build"]
     cmds:
-      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:AppresizeTests
+      - xcodebuild test-without-building -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_DEBUG}}" -derivedDataPath "{{.BUILD_DIR}}" -destination "{{.DESTINATION}}" -only-testing:HyperWindowTests
 
   run:
     desc: Build and run the app (Debug)
@@ -82,12 +82,12 @@ tasks:
     desc: Copy the built app release to the Applications folder
     deps: ["build:release"]
     cmds:
-      - /usr/bin/xcrun swift ./scripts/install-release.swift "{{.RELEASE_APP_PATH}}" /Applications/Appresize.app
+      - /usr/bin/xcrun swift ./scripts/install-release.swift "{{.RELEASE_APP_PATH}}" /Applications/HyperWindow.app
 
   open:
     desc: Run the built app (Debug)
     cmds:
-      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/Appresize.app"
+      - open "{{.BUILD_DIR}}/Build/Products/{{.CONFIGURATION_DEBUG}}/HyperWindow.app"
 
   open:release:
     desc: Run the built app (Release)
@@ -97,7 +97,7 @@ tasks:
   archive:
     desc: Create an archive for distribution
     cmds:
-      - xcodebuild archive -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" -archivePath "{{.BUILD_DIR}}/Appresize.xcarchive"
+      - xcodebuild archive -project "{{.PROJECT}}" -scheme "{{.SCHEME}}" -configuration "{{.CONFIGURATION_RELEASE}}" -derivedDataPath "{{.BUILD_DIR}}" -archivePath "{{.BUILD_DIR}}/HyperWindow.xcarchive"
 
   dev:
     desc: Quick development cycle (clean, build, test)

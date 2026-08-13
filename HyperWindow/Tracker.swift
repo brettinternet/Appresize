@@ -52,7 +52,7 @@ private final class EventTapThread {
         let thread = Thread { [weak self] in
             self?.run(install: install)
         }
-        thread.name = "cloud.brett.Appresize.event-tap"
+        thread.name = "cloud.brett.HyperWindow.event-tap"
         thread.qualityOfService = .userInteractive
         thread.threadPriority = 1.0
         self.thread = thread
@@ -186,7 +186,7 @@ class Tracker {
     }
 
 
-    private static let commitQueue = DispatchQueue(label: "cloud.brett.Appresize.window-commit")
+    private static let commitQueue = DispatchQueue(label: "cloud.brett.HyperWindow.window-commit")
 
     // Tracker.shared is created and destroyed on the main thread. With a live
     // tap, the tap thread exclusively owns currentState, modifier snapshots,

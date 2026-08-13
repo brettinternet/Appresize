@@ -6,7 +6,7 @@ func showAccessibilityAlert() {
     let alert = NSAlert()
     alert.messageText = "Accessibility permissions required"
     alert.informativeText = """
-    Appresize requires Accessibility permissions in order to be able to move and resize windows for you.
+    HyperWindow requires Accessibility permissions in order to be able to move and resize windows for you.
 
     You can grant Accessibility permission in System Settings → Privacy & Security → Accessibility.
 
@@ -25,7 +25,7 @@ func showRestartPrompt() {
     let alert = NSAlert()
     alert.messageText = "Restart required"
     alert.informativeText = """
-    Appresize has Accessibility permission, but window management could not be activated.
+    HyperWindow has Accessibility permission, but window management could not be activated.
 
     Restart the app to try again.
     """
@@ -44,7 +44,7 @@ func showPermissionRevokedAlert() {
     alert.alertStyle = .warning
     alert.messageText = "Accessibility permissions revoked"
     alert.informativeText = """
-    Appresize has detected that accessibility permissions were removed.
+    HyperWindow has detected that accessibility permissions were removed.
     
     Window management has been automatically disabled to prevent system instability.
     
@@ -79,7 +79,7 @@ func restartApp() {
     do {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
-        task.arguments = ["-c", script, "Appresize restart", String(currentPID), bundlePath]
+        task.arguments = ["-c", script, "HyperWindow restart", String(currentPID), bundlePath]
         try task.run()
 
         log(.debug, "Restart helper launched successfully")
@@ -99,7 +99,7 @@ private func showManualRestartInstructions() {
     let alert = NSAlert()
     alert.messageText = "Please restart the app manually"
     alert.informativeText = """
-    The automatic restart failed. Please manually quit and reopen Appresize to activate window management functionality.
+    The automatic restart failed. Please manually quit and reopen HyperWindow to activate window management functionality.
     
     The app will now quit.
     """

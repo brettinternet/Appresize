@@ -17,7 +17,7 @@ if ! release_version_parse "$tag"; then
 fi
 
 output_dir=$(mkdir -p "$output_dir" && cd "$output_dir" && pwd)
-archive="Appresize-${tag}-macos-universal.dmg"
+archive="HyperWindow-${tag}-macos-universal.dmg"
 for output in "$output_dir/$archive" "$output_dir/$archive.sha256"; do
   if [[ -e "$output" ]]; then
     echo "package-release.sh: refusing to overwrite existing output: $output" >&2
@@ -26,8 +26,8 @@ for output in "$output_dir/$archive" "$output_dir/$archive.sha256"; do
 done
 
 "$repo_root/scripts/build-release.sh" "$tag"
-app_path="$repo_root/build/Build/Products/Release/Appresize.app"
-staging=$(mktemp -d "${TMPDIR:-/tmp}/appresize-release.XXXXXX")
+app_path="$repo_root/build/Build/Products/Release/HyperWindow.app"
+staging=$(mktemp -d "${TMPDIR:-/tmp}/hyperwindow-release.XXXXXX")
 cleanup() {
   if [[ -x /usr/bin/trash && -e "$staging" ]]; then
     /usr/bin/trash "$staging" || true
@@ -35,10 +35,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-ditto "$app_path" "$staging/Appresize.app"
+ditto "$app_path" "$staging/HyperWindow.app"
 ln -s /Applications "$staging/Applications"
 hdiutil create \
-  -volname "Appresize $tag" \
+  -volname "HyperWindow $tag" \
   -srcfolder "$staging" \
   -ov \
   -format UDZO \

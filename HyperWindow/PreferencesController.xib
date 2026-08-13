@@ -5,7 +5,7 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
-        <customObject id="-2" userLabel="File's Owner" customClass="PreferencesController" customModule="Appresize" customModuleProvider="target">
+        <customObject id="-2" userLabel="File's Owner" customClass="PreferencesController" customModule="HyperWindow" customModuleProvider="target">
             <connections>
                 <outlet property="accessibilityStatusLabel" destination="jFx-3h-BvR" id="accessibilityStatusLabel-outlet"/>
                 <outlet property="githubLink" destination="github-attribution-link" id="github-link-outlet"/>
@@ -31,7 +31,7 @@
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
-        <window title="Appresize Settings" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="YES" releasedWhenClosed="NO" animationBehavior="default" id="F0z-JX-Cv5">
+        <window title="HyperWindow Settings" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="YES" releasedWhenClosed="NO" animationBehavior="default" id="F0z-JX-Cv5">
             <windowStyleMask key="styleMask" titled="YES" closable="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
             <rect key="contentRect" x="196" y="240" width="390" height="282"/>
@@ -199,7 +199,7 @@
                             <action selector="resizeFromNearestCornerClicked:" target="-2" id="WcX-aB-Oy4"/>
                         </connections>
                     </button>
-                    <button toolTip="Shows or hides the Appresize icon in the menu bar. Use the menu bar icon to access preferences and quit the app." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="pNU-or-TOn">
+                    <button toolTip="Shows or hides the HyperWindow icon in the menu bar. Use the menu bar icon to access preferences and quit the app." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="pNU-or-TOn">
                         <rect key="frame" x="210" y="186" width="162" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Show menu icon" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="veU-QV-ewB">
@@ -210,7 +210,7 @@
                             <action selector="hideMenuIconClicked:" target="-2" id="mNd-W0-MRv"/>
                         </connections>
                     </button>
-                    <button toolTip="Automatically starts Appresize when you log in to your Mac. The app will run in the background and be ready to use immediately." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TnR-QZ-Jig">
+                    <button toolTip="Automatically starts HyperWindow when you log in to your Mac. The app will run in the background and be ready to use immediately." verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="TnR-QZ-Jig">
                         <rect key="frame" x="210" y="161" width="162" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="check" title="Launch at login" bezelStyle="regularSquare" imagePosition="left" inset="2" id="cdX-Sz-m46">
@@ -284,7 +284,7 @@
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="8bC-9T-mxN">
                         <rect key="frame" x="18" y="52" width="199" height="32"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <string key="toolTip">Opens System Settings to the Privacy &amp; Security → Accessibility section where you can grant Appresize permission to control your computer.</string>
+                        <string key="toolTip">Opens System Settings to the Privacy &amp; Security → Accessibility section where you can grant HyperWindow permission to control your computer.</string>
                         <buttonCell key="cell" type="push" title="Grant Accessibility Access" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="4nX-mL-dkS">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="smallSystem"/>
