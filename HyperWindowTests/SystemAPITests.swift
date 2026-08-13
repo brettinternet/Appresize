@@ -133,6 +133,19 @@ final class SystemAPITests: XCTestCase {
         XCTAssertTrue(CFEqual(result, expected))
     }
 
+    func testAccessibilityHitTestExcludesHyperWindowProcess() {
+        let ownApplication = AXUIElementCreateApplication(getpid())
+
+        let result = AXUIElement.window(
+            at: .zero,
+            windowInfoProvider: { [] },
+            accessibilityWindowProvider: { _ in nil },
+            accessibilityHitTest: { _ in ownApplication }
+        )
+
+        XCTAssertNil(result)
+    }
+
     private func windowInfo(
         pid: pid_t,
         frame: CGRect,

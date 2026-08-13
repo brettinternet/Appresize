@@ -76,6 +76,12 @@ extension AXUIElement {
         return AXUIElementIsAttributeSettable(self, attribute as CFString, &settable) == .success && settable.boolValue
     }
 
+    private var processIdentifier: pid_t? {
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(self, &pid) == .success else { return nil }
+        return pid
+    }
+
     private var windowFrame: CGRect? {
         guard let origin, let size else { return nil }
         return CGRect(origin: origin, size: size)
@@ -118,7 +124,11 @@ extension AXUIElement {
             return matchedWindow
         }
 
-        return accessibilityHitTest(position)
+        guard let hitTestWindow = accessibilityHitTest(position),
+              hitTestWindow.processIdentifier != getpid() else {
+            return nil
+        }
+        return hitTestWindow
     }
 
     private class func accessibilityWindow(matching hit: CGWindowHit) -> AXUIElement? {
