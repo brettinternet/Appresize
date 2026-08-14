@@ -26,8 +26,7 @@ func frontmostWindow(
     excludingPID: pid_t
 ) -> CGWindowHit? {
     for info in windowInfo {
-        guard (info[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
-              let ownerPID = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+        guard let ownerPID = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
               ownerPID != excludingPID,
               let bounds = info[kCGWindowBounds as String] as? NSDictionary else {
             continue
@@ -115,18 +114,20 @@ extension AXUIElement {
         accessibilityWindowProvider: (CGWindowHit) -> AXUIElement?,
         accessibilityHitTest: (CGPoint) -> AXUIElement?
     ) -> AXUIElement? {
-        if let hit = frontmostWindow(
+        guard let hit = frontmostWindow(
             at: position,
             in: windowInfoProvider(),
             excludingPID: getpid()
-        ),
-        let matchedWindow = accessibilityWindowProvider(hit) {
+        ) else {
+            return nil
+        }
+
+        if let matchedWindow = accessibilityWindowProvider(hit) {
             return matchedWindow
         }
 
         guard let hitTestWindow = accessibilityHitTest(position),
-              let pid = hitTestWindow.processIdentifier,
-              pid != getpid() else {
+              hitTestWindow.processIdentifier == hit.ownerPID else {
             return nil
         }
         return hitTestWindow
